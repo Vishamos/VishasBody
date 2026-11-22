@@ -6,7 +6,7 @@ JOINT_NAMES = {11: "L shoulder", 12: "R shoulder", 13: "L elbow",
                23: "L hip", 24: "R hip"}
 PANEL_JOINTS = (11, 12, 13, 14, 15, 16, 23, 24)   # 가시성을 기록할 점
 WRISTS = (15, 16)
-# 단계별 처리 시간 (ms). pose와 hand는 동시에 돌고, infer는 둘 다 끝날 때까지의 실제 시간
+# 단계별 처리 시간 (ms). hand는 pose와 동시에 돌지만 프레임이 기다리지 않음. infer는 프레임이 추론을 기다린 실제 시간
 TIMING_KEYS = ("pose", "hand", "infer", "draw")
 
 

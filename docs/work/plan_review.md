@@ -16,4 +16,5 @@
 - (2026-11-22) 서브에이전트(developer·qa·security)는 두지 않는다. 테스트는 `test/`(커밋) + `.temp/`(임시)
 - (2026-11-22) `[Body-Packet-Hand]` 손 좌표 원점은 손목(0번). 손바닥 회전은 `LookRotation(손가락 방향=+z, 손바닥 방향=+y)`, 계산 불가면 (0, 0, 0, 0)
 - (2026-11-22) `[Body-Packet-Header]` seq는 1부터 +1, timestamp_ms는 프레임을 읽은 시각(트래커 시작 후 ms)
+- (2026-11-22) `[Body-Track-Perf]` 몸 프레임은 손 추론을 기다리지 않는다. 손은 최신 완료 결과를 쓴다(손 약 15∼30 FPS, 몸 30 FPS). 근거: 손이 보이면 25 FPS로 떨어짐(GitHub 이슈 #1)
 - (2026-11-22) VishaSynapse 기준은 GitHub `Vishamos/VishaSynapse`, 저장소 전체 읽기 허용(수정 금지)

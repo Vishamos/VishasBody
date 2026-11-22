@@ -49,6 +49,8 @@ def main():
         return
 
     cap = cv2.VideoCapture(args.camera, cv2.CAP_DSHOW)
+    # 처리가 늦을 때 밀린 프레임이 쌓여 지연이 늘지 않게. 드라이버가 무시할 수 있어 결과를 출력
+    print(f"[카메라] 버퍼 1장 설정 {'적용' if cap.set(cv2.CAP_PROP_BUFFERSIZE, 1) else '무시됨'}")
     server_url = load_server_url()
     if server_url is None:
         print("[송신] config 폴더에 config.local.json이 없어 보내지 않고 트래킹만 합니다 "
@@ -58,6 +60,9 @@ def main():
     stats = TrackingStats()
     renderer = Renderer("capture", debug=args.debug)
     start = time.time()
+    hand_job = None         # 실행 중인 손 추론 (C#의 Task)
+    hand_pose_pts = None    # 손 추론에 넘긴 프레임의 포즈 (좌우 판정용)
+    hands = []              # 최신 완료 손 결과
 
     try:
         with PoseTracker(POSE_MODEL) as pose_tracker, HandTracker(HAND_MODEL) as hand_tracker, \
@@ -72,18 +77,27 @@ def main():
                 image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
                 timestamp_ms = int((time.time() - start) * 1000)
 
-                # 추론: 같은 사진을 Pose와 Hand가 동시에 분석
+                # 추론: Pose는 매 프레임 기다리고, Hand는 기다리지 않음 (명세 01 §1.1)
+                # 손 추론이 끝나 있으면 결과를 받고 이 프레임으로 다시 시작, 아니면 직전 손 결과를 그대로 씀
                 t0 = time.perf_counter()
                 pose_job = pool.submit(timed, pose_tracker.detect, image, timestamp_ms)
-                hand_job = pool.submit(timed, hand_tracker.detect, image, timestamp_ms)
+                hand_result = None
+                if hand_job is not None and hand_job.done():
+                    hand_result, hand_sec = hand_job.result()
+                    stats.add_time("hand", hand_sec)
+                    hand_job = None
+                hand_started = hand_job is None
+                if hand_started:
+                    hand_job = pool.submit(timed, hand_tracker.detect, image, timestamp_ms)
                 pose_result, pose_sec = pose_job.result()
-                hand_result, hand_sec = hand_job.result()
                 stats.add_time("pose", pose_sec)
-                stats.add_time("hand", hand_sec)
-                stats.add_time("infer", time.perf_counter() - t0)   # 둘 다 끝날 때까지 실제 걸린 시간
+                stats.add_time("infer", time.perf_counter() - t0)   # 프레임이 추론을 기다린 실제 시간
 
                 pose_pts = pose_result.pose_landmarks[0] if pose_result.pose_landmarks else None
-                hands = analyze_hands(hand_result, pose_pts)
+                if hand_result is not None:
+                    hands = analyze_hands(hand_result, hand_pose_pts)
+                if hand_started:
+                    hand_pose_pts = pose_pts
 
                 if sender:
                     # seq는 패킷을 만들 때마다 올림: 송신 스레드가 버린 프레임은 받는 쪽에서 건너뜀으로 보임
