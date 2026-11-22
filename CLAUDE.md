@@ -35,6 +35,8 @@
 | `docs/protocol/` | 받는 쪽(Vishamos)용 Body 데이터 규약. 명세가 바뀌면 함께 고친다 |
 | `docs/work/worklist.md` | 남은 작업과 현재 진행 |
 | `docs/work/plan_review.md` | 노션에 반영할 기획 질문 |
+| `src/` | Python 코드(진입점 `src/main.py`). 실행은 루트의 `BodyTracker.bat` |
+| `config/`, `models/` | 서버 주소 설정(`config.local.json`, git 제외), MediaPipe 모델(`*.task`, git 제외) |
 | `test/` | 명세 기준 회귀 테스트(unittest, 커밋) |
 | `.temp/` | 개발 중 임시 스크립트(git 제외) |
 | `.githooks/` | 커밋 전 검사 훅 |

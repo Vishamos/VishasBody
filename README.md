@@ -40,27 +40,21 @@
 
 ## 4. 실행 방법
 
-모델 파일은 저장소에 없습니다. 처음 한 번 이 폴더에 내려받습니다 (Google MediaPipe 공식 모델, Apache 2.0).
+**`BodyTracker.bat`을 더블클릭**하면 됩니다. 처음 한 번만 아래 두 가지를 준비합니다.
 
-```powershell
-Invoke-WebRequest https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/latest/pose_landmarker_full.task -OutFile pose_landmarker_full.task
-Invoke-WebRequest https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/latest/hand_landmarker.task -OutFile hand_landmarker.task
-```
+1. 모델 파일을 `models` 폴더에 내려받습니다 (Google MediaPipe 공식 모델, Apache 2.0, git 제외).
+   ```powershell
+   Invoke-WebRequest https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/latest/pose_landmarker_full.task -OutFile models\pose_landmarker_full.task
+   Invoke-WebRequest https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/latest/hand_landmarker.task -OutFile models\hand_landmarker.task
+   ```
+2. 서버 주소 파일을 만듭니다 (git 제외).
+   ```powershell
+   Copy-Item config\config.example.json config\config.local.json   # 열어서 server_url을 서버 PC의 LAN IP로 고침
+   ```
+   - 없으면 보내지 않고 트래킹만 합니다. 서버가 꺼져 있으면 2초마다 다시 접속합니다.
 
-패키지는 `BodyTracker.bat`이 빠진 것이 있을 때 `requirements.txt`대로 자동 설치합니다(실행할 Python과 같은 Python에 설치). 직접 설치하려면 `py -3.12 -m pip install -r requirements.txt`.
-
-서버 주소는 처음 한 번 준비합니다.
-
-```powershell
-Copy-Item config.example.json config.local.json   # 열어서 server_url을 서버 PC의 LAN IP로 고침 (git 제외)
-```
-
-- `config.local.json`이 없으면 보내지 않고 트래킹만 합니다. 서버가 꺼져 있으면 2초마다 다시 접속합니다.
-
-```powershell
-python main.py            # 기본: 간단 상태 화면
-python main.py --debug    # 디버그 화면으로 시작
-```
+- 패키지는 `BodyTracker.bat`이 빠진 것이 있을 때 `requirements.txt`대로 자동 설치합니다(실행할 Python과 같은 Python에 설치). 직접 설치하려면 `py -3.12 -m pip install -r requirements.txt`.
+- 옵션: `BodyTracker.bat --debug`(디버그 화면으로 시작), `--camera 1`(카메라 번호)
 
 | 조작 | 기능 |
 |---|---|
@@ -68,25 +62,27 @@ python main.py --debug    # 디버그 화면으로 시작
 | `m` / MIRROR 버튼 | 좌우 반전 (화면 표시에만 적용, 전송 좌표는 그대로) |
 | `q` / QUIT 버튼 / 창 닫기(X) | 종료 → 터미널에 트래킹 요약 출력 |
 
-- Claude Code에서 `! python main.py`로 실행하면 종료 요약이 대화에 바로 남음
+- Claude Code에서 `! python src/main.py`로 실행하면 종료 요약이 대화에 바로 남음
 - **카메라 영상은 어느 모드에서도 표시하지 않음** (방송 송출 방지, 의도된 설계)
 
 ## 5. 파일 구성
 
-| 파일 | 역할 |
+| 위치 | 역할 |
 |---|---|
-| `main.py` | 진입점. 카메라 루프, Pose/Hand **병렬 추론**, 각 부품 연결 |
-| `trackers.py` | `PoseTracker`, `HandTracker` (MediaPipe VIDEO 모드 래퍼) |
-| `hand_math.py` | `HandState`, 손바닥 축 계산, 왼손/오른손 판정 |
-| `body_packet.py` | 한 프레임을 1,080바이트 패킷으로 (Unity 좌표 변환, 손바닥 쿼터니언). 형식은 `docs/protocol/README.md` |
-| `synapse_sender.py` | `SynapseSender` (송신 스레드: 접속 → 등록 → 최신 패킷 송신, 끊기면 재접속) |
 | `BodyTracker.bat` | 실행 파일. `.venv`가 있으면 그 Python, 없으면 `py -3.12`. 빠진 패키지 자동 설치 |
 | `requirements.txt` | 패키지 버전 고정 (mediapipe, opencv-python, websockets) |
-| `config.example.json` | 서버 주소 설정 예시. `config.local.json`으로 복사해 씀 |
-| `stats.py` | `TrackingStats` (FPS, 가시성, 이동량, 단계별 처리 시간, 종료 요약) |
-| `renderer.py` | `Renderer` (색 정의, 디버그/간단 화면, 버튼·키 입력) |
-| `pose_test.py` | 분리 전 단일 파일 버전. **비교용으로만 보관**, 더 이상 수정 안 함 |
-| `*.task` | 모델: `pose_landmarker_full`, `hand_landmarker`. git 제외, 4번의 명령으로 내려받음 |
+| `config/` | `config.example.json`(서버 주소 예시), `config.local.json`(PC별 실제 주소, git 제외) |
+| `models/` | 모델 `pose_landmarker_full.task`, `hand_landmarker.task` (git 제외, 4번 명령으로 내려받음) |
+| `src/main.py` | 진입점. 카메라 루프, Pose/Hand **병렬 추론**, 각 부품 연결 |
+| `src/trackers.py` | `PoseTracker`, `HandTracker` (MediaPipe VIDEO 모드 래퍼) |
+| `src/hand_math.py` | `HandState`, 손바닥 축 계산, 왼손/오른손 판정 |
+| `src/body_packet.py` | 한 프레임을 1,080바이트 패킷으로 (Unity 좌표 변환, 손바닥 쿼터니언). 형식은 `docs/protocol/README.md` |
+| `src/synapse_sender.py` | `SynapseSender` (송신 스레드: 접속 → 등록 → 최신 패킷 송신, 끊기면 재접속) |
+| `src/stats.py` | `TrackingStats` (FPS, 가시성, 이동량, 단계별 처리 시간, 종료 요약) |
+| `src/renderer.py` | `Renderer` (색 정의, 디버그/간단 화면, 버튼·키 입력) |
+| `src/legacy/pose_test.py` | 분리 전 단일 파일 버전. **비교용으로만 보관**, 더 이상 수정 안 함 |
+| `test/` | 단위 테스트 (`python -B -m unittest discover -s test`) |
+| `docs/` | 기술 명세, Body 프로토콜, 작업 목록 |
 | `__pycache__/` | Python이 자동 생성하는 캐시. 정상, 신경 쓰지 않아도 됨 |
 
 ## 6. 송신 데이터

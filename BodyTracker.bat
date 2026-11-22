@@ -1,5 +1,5 @@
 @echo off
-rem VishasBody tracker launcher. Extra args are passed to main.py (e.g. --debug, --camera 1)
+rem VishasBody tracker launcher. Extra args are passed to src\main.py (e.g. --debug, --camera 1)
 cd /d "%~dp0"
 
 rem Do not call bare "python": on a PC without it, Windows auto-installs the latest Python.
@@ -15,7 +15,7 @@ rem Install packages with the same Python that runs the tracker, only when somet
     )
 )
 
-%PY% main.py %*
+%PY% src\main.py %*
 
 echo.
 pause

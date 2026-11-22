@@ -15,10 +15,10 @@ from stats import TrackingStats
 from synapse_sender import SynapseSender
 from trackers import HandTracker, PoseTracker
 
-BASE_DIR = Path(__file__).resolve().parent       # 어느 폴더에서 실행해도 모델을 찾도록
-POSE_MODEL = BASE_DIR / "pose_landmarker_full.task"
-HAND_MODEL = BASE_DIR / "hand_landmarker.task"
-CONFIG_FILE = BASE_DIR / "config.local.json"   # PC별 서버 주소 (git 제외, config.example.json 참고)
+ROOT_DIR = Path(__file__).resolve().parent.parent   # 프로젝트 폴더. 어느 폴더에서 실행해도 찾도록
+POSE_MODEL = ROOT_DIR / "models" / "pose_landmarker_full.task"
+HAND_MODEL = ROOT_DIR / "models" / "hand_landmarker.task"
+CONFIG_FILE = ROOT_DIR / "config" / "config.local.json"   # PC별 서버 주소 (git 제외, config.example.json 참고)
 
 
 def timed(fn, *args):
@@ -43,10 +43,16 @@ def main():
     parser.add_argument("--camera", type=int, default=0, help="카메라 번호")
     args = parser.parse_args()
 
+    missing = [p.name for p in (POSE_MODEL, HAND_MODEL) if not p.exists()]
+    if missing:
+        print(f"[모델] models 폴더에 {', '.join(missing)}이 없습니다. README '실행 방법'의 명령으로 내려받으세요")
+        return
+
     cap = cv2.VideoCapture(args.camera, cv2.CAP_DSHOW)
     server_url = load_server_url()
     if server_url is None:
-        print(f"[송신] {CONFIG_FILE.name}이 없어 보내지 않고 트래킹만 합니다")
+        print("[송신] config 폴더에 config.local.json이 없어 보내지 않고 트래킹만 합니다 "
+              "(config.example.json을 복사해 server_url을 고치면 송신)")
     sender = SynapseSender(server_url) if server_url else None
     seq = 0
     stats = TrackingStats()
