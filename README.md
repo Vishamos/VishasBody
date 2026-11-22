@@ -47,10 +47,11 @@ Invoke-WebRequest https://storage.googleapis.com/mediapipe-models/pose_landmarke
 Invoke-WebRequest https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/latest/hand_landmarker.task -OutFile hand_landmarker.task
 ```
 
-송신용 라이브러리와 서버 주소를 처음 한 번 준비합니다.
+패키지는 `BodyTracker.bat`이 빠진 것이 있을 때 `requirements.txt`대로 자동 설치합니다(실행할 Python과 같은 Python에 설치). 직접 설치하려면 `py -3.12 -m pip install -r requirements.txt`.
+
+서버 주소는 처음 한 번 준비합니다.
 
 ```powershell
-pip install websockets
 Copy-Item config.example.json config.local.json   # 열어서 server_url을 서버 PC의 LAN IP로 고침 (git 제외)
 ```
 
@@ -79,6 +80,8 @@ python main.py --debug    # 디버그 화면으로 시작
 | `hand_math.py` | `HandState`, 손바닥 축 계산, 왼손/오른손 판정 |
 | `body_packet.py` | 한 프레임을 1,080바이트 패킷으로 (Unity 좌표 변환, 손바닥 쿼터니언). 형식은 `docs/protocol/README.md` |
 | `synapse_sender.py` | `SynapseSender` (송신 스레드: 접속 → 등록 → 최신 패킷 송신, 끊기면 재접속) |
+| `BodyTracker.bat` | 실행 파일. `.venv`가 있으면 그 Python, 없으면 `py -3.12`. 빠진 패키지 자동 설치 |
+| `requirements.txt` | 패키지 버전 고정 (mediapipe, opencv-python, websockets) |
 | `config.example.json` | 서버 주소 설정 예시. `config.local.json`으로 복사해 씀 |
 | `stats.py` | `TrackingStats` (FPS, 가시성, 이동량, 단계별 처리 시간, 종료 요약) |
 | `renderer.py` | `Renderer` (색 정의, 디버그/간단 화면, 버튼·키 입력) |

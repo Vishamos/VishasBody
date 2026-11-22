@@ -18,7 +18,7 @@
 - [ ] (Vishamos 프로젝트) 수신 버퍼 1KB → 1,080바이트 이상, `docs/protocol/README.md` §5대로 수신
 
 ## Doc. 문서
-- [ ] Doc-1 README를 새 구조에 맞게 정리(Send-2에서 2·3·4·5번 송신 관련 줄과 6번 임시 형식은 고침): 12번 옛 서버 요약(서버가 먼저 `[0,0]` 인사, deviceType 10·30) 폐기 → `docs/protocol`·Synapse 규약 참조로, 6번 송신 데이터를 명세 01 참조로, 10번 설계 메모 삭제(명세로 옮겨짐), 3번 환경(PC별 경로·Python) 정정, `requirements.txt` 추가(실행 PC 확인 버전: Python 3.12.10, mediapipe 1.2.0, opencv-python 5.0.0.93, websockets 17.4는 개발 PC 기준), 4번 실행 방법에 "실행 PC는 git pull 후 실행, 개발 PC(Python 3.15)는 단위 테스트만" 추가 — 기획: 없음 / 명세: 01
+- [ ] Doc-1 README를 새 구조에 맞게 정리(Send-2에서 2·3·4·5번 송신 관련 줄과 6번 임시 형식, 4번 패키지 자동 설치는 고침): 12번 옛 서버 요약(서버가 먼저 `[0,0]` 인사, deviceType 10·30) 폐기 → `docs/protocol`·Synapse 규약 참조로, 6번 송신 데이터를 명세 01 참조로, 10번 설계 메모 삭제(명세로 옮겨짐), 3번 환경(PC별 경로·Python) 정정, 4번 실행 방법에 "실행 PC는 git pull 후 실행, 개발 PC(Python 3.15)는 단위 테스트만" 추가 — 기획: 없음 / 명세: 01
 
 ## Send. 송신
 

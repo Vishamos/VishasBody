@@ -2,12 +2,20 @@
 rem VishasBody tracker launcher. Extra args are passed to main.py (e.g. --debug, --camera 1)
 cd /d "%~dp0"
 
-if exist ".venv\Scripts\python.exe" (
-    ".venv\Scripts\python.exe" main.py %*
-) else (
-    rem Do not call bare "python": on a PC without it, Windows auto-installs the latest Python.
-    py -3.12 main.py %*
+rem Do not call bare "python": on a PC without it, Windows auto-installs the latest Python.
+if exist ".venv\Scripts\python.exe" (set "PY=.venv\Scripts\python.exe") else (set "PY=py -3.12")
+
+rem Install packages with the same Python that runs the tracker, only when something is missing.
+%PY% -c "import mediapipe, cv2, websockets" 2>nul || (
+    echo [setup] Installing packages from requirements.txt ...
+    %PY% -m pip install -r requirements.txt || (
+        echo [setup] Install failed. See the messages above.
+        pause
+        exit /b 1
+    )
 )
+
+%PY% main.py %*
 
 echo.
 pause
