@@ -49,8 +49,6 @@ def main():
         return
 
     cap = cv2.VideoCapture(args.camera, cv2.CAP_DSHOW)
-    # 처리가 늦을 때 밀린 프레임이 쌓여 지연이 늘지 않게. 드라이버가 무시할 수 있어 결과를 출력
-    print(f"[카메라] 버퍼 1장 설정 {'적용' if cap.set(cv2.CAP_PROP_BUFFERSIZE, 1) else '무시됨'}")
     server_url = load_server_url()
     if server_url is None:
         print("[송신] config 폴더에 config.local.json이 없어 보내지 않고 트래킹만 합니다 "
