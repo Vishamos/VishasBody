@@ -1,0 +1,24 @@
+#!/bin/sh
+# 커밋 전 검사 (capture-git 스킬 "커밋 전 검사").
+# 설치: git config core.hooksPath .githooks
+# 실패하면 커밋을 막는다.
+
+fail() {
+    echo "[pre-commit] $1 커밋을 막았습니다."
+    exit 1
+}
+
+# 1. 제외 대상이 스테이징되었는지
+blocked=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '(^|/)\.env($|\.)|\.env$|\.pem$|settings\.local\.json$|(^|/)config\.local\.')
+if [ -n "$blocked" ]; then
+    echo "$blocked"
+    fail "커밋하면 안 되는 파일이 스테이징되어 있습니다."
+fi
+
+# 2. 스테이징된 Python 문법 검사 (py_compile 대신 ast: __pycache__를 만들지 않음)
+files=$(git diff --cached --name-only --diff-filter=ACMR -- '*.py')
+if [ -n "$files" ]; then
+    python -c "import ast,sys; [ast.parse(open(f, encoding='utf-8').read(), f) for f in sys.argv[1:]]" $files || fail "Python 문법 오류가 있습니다."
+fi
+
+exit 0
