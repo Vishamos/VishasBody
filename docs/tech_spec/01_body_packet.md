@@ -1,6 +1,6 @@
 # 명세 01: Body 트래킹·송신
 
-- 상태: **초안** (사용자 승인 전)
+- 상태: **확정** (2026-11-22 사용자 승인)
 - 근거: 노션 `VishaSTD / VishasBody` (2026-11-22 01:54 판), VishaSynapse 프로토콜 2026-11-18판
 - 받는 쪽용 바이트 배치와 처리 규칙: [`docs/protocol/README.md`](../protocol/README.md). 이 명세는 무엇을 정했는지와 근거, 구현 현황을 담는다. 배치가 둘 사이에 다르면 이 명세를 기준으로 프로토콜 문서를 고친다.
 
@@ -44,12 +44,12 @@
 | 4.2 | 종류 번호 31, 버전 1 | 확정(사용자 답변) | `[Body-Packet-Header]` |
 | 4.3 | flags 뒤에 예약 바이트 3개(0)를 넣어 `seq`·`timestamp_ms`·모든 float를 4바이트 경계에 정렬(float 시작 오프셋 16). 받는 쪽이 `MemoryMarshal.Cast`로 복사 없이 읽음 | 확정(사용자 답변) | `[Body-Packet-Header]` |
 | 4.4 | flags bit0 몸, bit1 왼손, bit2 오른손. 검출 안 된 부위는 0으로 채움 | 확정 | `[Body-Packet]`, `[Body-Packet-Header]` |
-| 4.5 | `seq`는 1부터 보낼 때마다 +1, `timestamp_ms`는 프레임을 읽은 시각(트래커 시작 후 ms, MediaPipe에 넘기는 값과 같음) | 해석 | `[Body-Packet-Header]`. 지금 코드의 타임스탬프를 그대로 씀 |
+| 4.5 | `seq`는 1부터 보낼 때마다 +1, `timestamp_ms`는 프레임을 읽은 시각(트래커 시작 후 ms, MediaPipe에 넘기는 값과 같음) | 확정(사용자 답변) | `[Body-Packet-Header]`. 지금 코드의 타임스탬프를 그대로 씀 |
 | 4.6 | 몸: `pose_world_landmarks` 33점 × (x, y, z, visibility), 미터, 원점 골반 중심 | 확정 | `[Body-Packet-Pose]` |
-| 4.7 | 손: `hand_world_landmarks` 21점 × (x, y, z), 미터, 원점 손 중심 + 손바닥 쿼터니언 | 확정 / 원점은 해석 | `[Body-Packet-Hand]`. MediaPipe 손 월드 좌표의 원점이 손 중심이라 그대로 둠 |
+| 4.7 | 손: `hand_world_landmarks` 21점 × (x, y, z), 미터, **원점 손목(0번 점을 21점에서 뺌, 0번은 항상 0)** + 손바닥 쿼터니언 | 확정(사용자 답변) | `[Body-Packet-Hand]`. MediaPipe 손 원점("대략적인 중심")은 정의가 불분명. 손목 원점이면 몸 손목에 그대로 더해 붙임 |
 | 4.8 | 좌표계: 트래커가 Unity 좌표로 변환. 위치 (x, y, z) → (−x, −y, −z) | 확정(사용자 답변) | `[Body-Packet-Coord]` |
-| 4.9 | 쿼터니언: (x, y, z, w) 순서. 변환된 Unity 좌표의 손가락 방향(+z)·손바닥 방향(+y)으로 `LookRotation`과 같게 만든다 | 확정(사용자 답변) / 축 정의는 해석 | `[Body-Packet-Coord]`. MediaPipe 쿼터니언을 "그대로" 쓰면 받는 쪽이 축 의미를 따로 알아야 하므로, Unity에서 바로 쓰는 정의로 고정 |
-| 4.10 | 손바닥 방향을 계산할 수 없으면 쿼터니언 (0, 0, 0, 0) | 해석 | `[Body-Packet-Hand]`. 검출 안 됨(0 채움)과 같은 규칙으로 받는 쪽 처리를 하나로 |
+| 4.9 | 쿼터니언: (x, y, z, w) 순서. 변환된 Unity 좌표의 손가락 방향(+z)·손바닥 방향(+y)으로 `LookRotation`과 같게 만든다 | 확정(사용자 답변) | `[Body-Packet-Coord]`. MediaPipe 쿼터니언을 "그대로" 쓰면 받는 쪽이 축 의미를 따로 알아야 하므로, Unity에서 바로 쓰는 정의로 고정 |
+| 4.10 | 손바닥 방향을 계산할 수 없으면 쿼터니언 (0, 0, 0, 0) | 확정(사용자 답변) | `[Body-Packet-Hand]`. 검출 안 됨(0 채움)과 같은 규칙으로 받는 쪽 처리를 하나로 |
 | 4.11 | 손가락 굽힘 값(블렌드 쉐이프와 비슷한 값) 추가 | 보류 | `[Body-Packet]`. 원본 21점을 먼저 보내고, Vishamos 리타기팅이 번거로우면 버전 2로 추가 |
 
 ## 구현 현황

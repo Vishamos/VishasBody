@@ -14,4 +14,6 @@
 - (2026-11-22) `[Body-Packet-Coord]` 트래커가 Unity 좌표로 변환해서 보냄. 쿼터니언 순서 x, y, z, w
 - (2026-11-22) `[Body-Packet-Header]` 종류 번호 31, flags 뒤 예약 바이트 3개로 4바이트 정렬 → 1,080바이트 (노션의 "약 1,077바이트"도 고칠 것)
 - (2026-11-22) 서브에이전트(developer·qa·security)는 두지 않는다. 테스트는 `test/`(커밋) + `.temp/`(임시)
+- (2026-11-22) `[Body-Packet-Hand]` 손 좌표 원점은 손목(0번). 손바닥 회전은 `LookRotation(손가락 방향=+z, 손바닥 방향=+y)`, 계산 불가면 (0, 0, 0, 0)
+- (2026-11-22) `[Body-Packet-Header]` seq는 1부터 +1, timestamp_ms는 프레임을 읽은 시각(트래커 시작 후 ms)
 - (2026-11-22) VishaSynapse 기준은 GitHub `Vishamos/VishaSynapse`, 저장소 전체 읽기 허용(수정 금지)
