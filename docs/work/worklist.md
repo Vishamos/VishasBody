@@ -2,7 +2,6 @@
 
 > **현재 진행 (2026-11-22):** 송신 완료. 실행 PC에서 VishaSynapse 등록·송신 확인됨(사용자). 남은 확인과 정리 단계.
 > **다음 할 일:**
-> 0. (사용자) Track-4 손 추론 비동기화 측정: 송출 PC에서 Unity와 같이 실행, 디버그 화면 FPS·pose·hand·infer·draw (손 0·1·2개), 시작 로그 `[카메라] 버퍼 1장 설정` 결과
 > 1. Track-3 트래커 창을 시작 시 한 번 맨 앞으로 (승인 대기)
 > 2. (사용자) 실행 PC 확인: 서버 재시작 후 재등록, 디버그 화면 FPS 30 근처, `py -3.12 -m pip show opencv-contrib-python` 버전 → Env-2
 > 3. Doc-1 README 정리 + Spec-2 (같이 커밋 가능)
@@ -34,7 +33,6 @@
 - [ ] Track-1 정지 떨림 측정: 손 5초 정지 × 자세 2∼3개(책상 위, 들어 올림) → 손목 이동량 3mm 이하 양호, 5mm 초과면 스무딩 필요. 측정 모드 추가가 필요하면 별도 제안 — 기획: `[Body-Track-Smooth]` / 명세: 01 §1.5
 - [ ] Track-2 스무딩 위치 결정 (One Euro Filter, 트래커 쪽이면 1ms 미만). Track-1 결과에 따름 — 기획: `[Body-Track-Smooth]` / 명세: 01 §1.5
 - [ ] Track-3 트래커 창이 다른 창 뒤에 가려져 안 보임(실행 PC, bat 실행 시) → 창 생성 직후 한 번만 맨 앞으로(계속 고정하지 않음, 방송 중 OBS 등을 가리지 않게). 프레임 비용 없음 — 기획: `[Body-View]` / 명세: 01 §2
-- [ ] Track-4 손 추론 비동기화 후 송출 PC 측정 (GitHub 이슈 #1). 구현 완료(손 결과를 기다리지 않음 + 카메라 버퍼 1장). FPS 30 근처면 종료, infer+draw가 33ms 경계에서 흔들리면 손 시작 간격을 최소 격 프레임으로 제한(손·몸 CPU 경합 감소, 손이 보이면 pose 25→28ms로 늘어남) — 기획: `[Body-Track-Perf]` / 명세: 01 §1.1, §1.2
 
 ## Env. 환경
 - [ ] Env-2 `requirements.txt` opencv 정리: mediapipe 1.2.0은 `opencv-contrib-python`(5.1.0.95)을 요구하고 `opencv-python`과 같은 `cv2` 폴더를 써서 서로 덮어씀. 실제로 불리는 것은 contrib → `opencv-python` 줄 삭제 권장. 실행 PC의 contrib 버전 확인 후 — 기획: 없음(AI 발견)
