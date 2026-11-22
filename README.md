@@ -28,12 +28,12 @@
 | 항목 | 상태 |
 |---|---|
 | 트래킹 (몸 + 손) | ✅ 동작, 30 FPS |
-| 송신 | 🔶 임시 형식으로 전송 중 (인증 없는 UDP, 포즈만. 손 데이터는 아직 안 보냄) |
-| 프로토콜 | 📝 VishaSynapse 접속 규약 확정, Body 데이터 형식은 초안 (`docs/protocol/README.md`, `docs/tech_spec/01_body_packet.md`) |
+| 송신 | 🔶 구현 완료, 실제 서버 연동 확인 전 (WebSocket → VishaSynapse, 몸 + 양손 1,080바이트) |
+| 프로토콜 | 📝 VishaSynapse 접속 규약 확정, Body 데이터 형식 확정 (`docs/protocol/README.md`, `docs/tech_spec/01_body_packet.md`) |
 
 ## 3. 환경
 
-- Windows 11, PowerShell, Python 3.12.10, mediapipe 1.2.0, opencv-python
+- Windows 11, PowerShell, Python 3.12.10, mediapipe 1.2.0, opencv-python 5.0.0.93, websockets 17.4
 - CPU 8스레드, GPU GTX 1060 6GB
 - (전체 시스템용, 이 프로젝트에서는 미사용) iPhone SE (A12 이상 → TrueDepth 없이 ARKit 얼굴 추적 가능), Mac + Xcode 보유
 - 저장소: GitHub `Vishamos/VishasBody` (`main` 브랜치, 공개, MIT)
@@ -46,6 +46,15 @@
 Invoke-WebRequest https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/latest/pose_landmarker_full.task -OutFile pose_landmarker_full.task
 Invoke-WebRequest https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/latest/hand_landmarker.task -OutFile hand_landmarker.task
 ```
+
+송신용 라이브러리와 서버 주소를 처음 한 번 준비합니다.
+
+```powershell
+pip install websockets
+Copy-Item config.example.json config.local.json   # 열어서 server_url을 서버 PC의 LAN IP로 고침 (git 제외)
+```
+
+- `config.local.json`이 없으면 보내지 않고 트래킹만 합니다. 서버가 꺼져 있으면 2초마다 다시 접속합니다.
 
 ```powershell
 python main.py            # 기본: 간단 상태 화면
@@ -68,7 +77,9 @@ python main.py --debug    # 디버그 화면으로 시작
 | `main.py` | 진입점. 카메라 루프, Pose/Hand **병렬 추론**, 각 부품 연결 |
 | `trackers.py` | `PoseTracker`, `HandTracker` (MediaPipe VIDEO 모드 래퍼) |
 | `hand_math.py` | `HandState`, 손바닥 축 계산, 왼손/오른손 판정 |
-| `udp_sender.py` | `UdpSender` (시퀀스 번호 + 포즈 패킷 전송). **송신 담당. 프로토콜 문서가 나오면 이 부분을 교체/확장** |
+| `body_packet.py` | 한 프레임을 1,080바이트 패킷으로 (Unity 좌표 변환, 손바닥 쿼터니언). 형식은 `docs/protocol/README.md` |
+| `synapse_sender.py` | `SynapseSender` (송신 스레드: 접속 → 등록 → 최신 패킷 송신, 끊기면 재접속) |
+| `config.example.json` | 서버 주소 설정 예시. `config.local.json`으로 복사해 씀 |
 | `stats.py` | `TrackingStats` (FPS, 가시성, 이동량, 단계별 처리 시간, 종료 요약) |
 | `renderer.py` | `Renderer` (색 정의, 디버그/간단 화면, 버튼·키 입력) |
 | `pose_test.py` | 분리 전 단일 파일 버전. **비교용으로만 보관**, 더 이상 수정 안 함 |
@@ -77,10 +88,8 @@ python main.py --debug    # 디버그 화면으로 시작
 
 ## 6. 송신 데이터
 
-### 현재 임시 형식 (프로토콜 문서 확정 전까지)
-- UDP `127.0.0.1:9000`, 인증 없음
-- `struct "<I132f"` = `uint 시퀀스 번호` + `33관절 × [x, y, z, visibility]`
-- 수신 측은 시퀀스 번호가 이전보다 작은 패킷을 버리는 것을 전제로 함
+### 현재 형식
+- WebSocket 바이너리 1,080바이트, 프레임마다. 배치와 받는 쪽 규칙은 `docs/protocol/README.md`, 근거는 `docs/tech_spec/01_body_packet.md`
 
 ### 트래커가 내보낼 수 있는 데이터 (프로토콜 설계 시 참고)
 | 데이터 | 내용 | 현재 전송 |

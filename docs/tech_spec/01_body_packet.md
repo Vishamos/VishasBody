@@ -44,7 +44,7 @@
 | 4.2 | 종류 번호 31, 버전 1 | 확정(사용자 답변) | `[Body-Packet-Header]` |
 | 4.3 | flags 뒤에 예약 바이트 3개(0)를 넣어 `seq`·`timestamp_ms`·모든 float를 4바이트 경계에 정렬(float 시작 오프셋 16). 받는 쪽이 `MemoryMarshal.Cast`로 복사 없이 읽음 | 확정(사용자 답변) | `[Body-Packet-Header]` |
 | 4.4 | flags bit0 몸, bit1 왼손, bit2 오른손. 검출 안 된 부위는 0으로 채움 | 확정 | `[Body-Packet]`, `[Body-Packet-Header]` |
-| 4.5 | `seq`는 1부터 보낼 때마다 +1, `timestamp_ms`는 프레임을 읽은 시각(트래커 시작 후 ms, MediaPipe에 넘기는 값과 같음) | 확정(사용자 답변) | `[Body-Packet-Header]`. 지금 코드의 타임스탬프를 그대로 씀 |
+| 4.5 | `seq`는 1부터 패킷을 만들 때마다(프레임마다) +1. 송신 스레드가 버린 프레임은 건너뜀으로 보임, `timestamp_ms`는 프레임을 읽은 시각(트래커 시작 후 ms, MediaPipe에 넘기는 값과 같음) | 확정(사용자 답변) | `[Body-Packet-Header]`. 지금 코드의 타임스탬프를 그대로 씀 |
 | 4.6 | 몸: `pose_world_landmarks` 33점 × (x, y, z, visibility), 미터, 원점 골반 중심 | 확정 | `[Body-Packet-Pose]` |
 | 4.7 | 손: `hand_world_landmarks` 21점 × (x, y, z), 미터, **원점 손목(0번 점을 21점에서 뺌, 0번은 항상 0)** + 손바닥 쿼터니언 | 확정(사용자 답변) | `[Body-Packet-Hand]`. MediaPipe 손 원점("대략적인 중심")은 정의가 불분명. 손목 원점이면 몸 손목에 그대로 더해 붙임 |
 | 4.8 | 좌표계: 트래커가 Unity 좌표로 변환. 위치 (x, y, z) → (−x, −y, −z) | 확정(사용자 답변) | `[Body-Packet-Coord]` |
@@ -57,6 +57,6 @@
 |---|---|---|
 | 1.1∼1.4, 2.1∼2.3 | 완료 (이 명세 이전 구현) | `c07903f` |
 | 1.5 | 보류 (Track-1 측정 대기) | |
-| 3.1∼3.4 | 미착수 (Send-2) | |
-| 4.1∼4.10 | 인코딩 완료 (`body_packet.py`, `test/test_body_packet.py`). 송신 연결은 Send-2 | Send-1 커밋 |
+| 3.1∼3.4 | 완료 (`synapse_sender.py`, `main.py`). 가짜 서버로 등록·송신·재접속 확인, 실제 서버 연동 확인 전 | Send-2 커밋 |
+| 4.1∼4.10 | 완료 (`body_packet.py`, `test/test_body_packet.py`) | Send-1 커밋 |
 | 4.11 | 보류 | |

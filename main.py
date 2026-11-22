@@ -1,4 +1,5 @@
 import argparse
+import json
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -7,16 +8,17 @@ from pathlib import Path
 import cv2
 import mediapipe as mp
 
+from body_packet import encode_frame
 from hand_math import analyze_hands
 from renderer import Renderer
 from stats import TrackingStats
+from synapse_sender import SynapseSender
 from trackers import HandTracker, PoseTracker
-from udp_sender import UdpSender
 
 BASE_DIR = Path(__file__).resolve().parent       # 어느 폴더에서 실행해도 모델을 찾도록
 POSE_MODEL = BASE_DIR / "pose_landmarker_full.task"
 HAND_MODEL = BASE_DIR / "hand_landmarker.task"
-UNITY_ADDR = ("127.0.0.1", 9000)   # 유니티가 받는 IP, 포트
+CONFIG_FILE = BASE_DIR / "config.local.json"   # PC별 서버 주소 (git 제외, config.example.json 참고)
 
 
 def timed(fn, *args):
@@ -26,17 +28,27 @@ def timed(fn, *args):
     return result, time.perf_counter() - t
 
 
+def load_server_url():
+    if not CONFIG_FILE.exists():
+        return None
+    return json.loads(CONFIG_FILE.read_text(encoding="utf-8"))["server_url"]
+
+
 def main():
     # 출력을 다른 곳으로 넘길 때(! 실행 등)도 한글이 깨지지 않게 UTF-8로 고정
     sys.stdout.reconfigure(encoding="utf-8")
 
-    parser = argparse.ArgumentParser(description="웹캠 상반신 + 손 트래킹 -> 유니티 UDP 전송")
+    parser = argparse.ArgumentParser(description="웹캠 상반신 + 손 트래킹 -> VishaSynapse 송신")
     parser.add_argument("--debug", action="store_true", help="디버그 화면으로 시작 (실행 중 d 키로 전환)")
     parser.add_argument("--camera", type=int, default=0, help="카메라 번호")
     args = parser.parse_args()
 
     cap = cv2.VideoCapture(args.camera, cv2.CAP_DSHOW)
-    sender = UdpSender(UNITY_ADDR)
+    server_url = load_server_url()
+    if server_url is None:
+        print(f"[송신] {CONFIG_FILE.name}이 없어 보내지 않고 트래킹만 합니다")
+    sender = SynapseSender(server_url) if server_url else None
+    seq = 0
     stats = TrackingStats()
     renderer = Renderer("capture", debug=args.debug)
     start = time.time()
@@ -65,10 +77,14 @@ def main():
                 stats.add_time("infer", time.perf_counter() - t0)   # 둘 다 끝날 때까지 실제 걸린 시간
 
                 pose_pts = pose_result.pose_landmarks[0] if pose_result.pose_landmarks else None
-                if pose_result.pose_world_landmarks:
-                    sender.send_pose(pose_result.pose_world_landmarks[0])
-
                 hands = analyze_hands(hand_result, pose_pts)
+
+                if sender:
+                    # seq는 패킷을 만들 때마다 올림: 송신 스레드가 버린 프레임은 받는 쪽에서 건너뜀으로 보임
+                    seq += 1
+                    pose_world = pose_result.pose_world_landmarks[0] if pose_result.pose_world_landmarks else None
+                    sender.send(encode_frame(seq, timestamp_ms, pose_world, hands))
+
                 stats.update(pose_result, hands)
 
                 # 화면 (그리기 + 창 갱신 + 키 입력 대기 시간 포함)
@@ -81,7 +97,8 @@ def main():
     finally:
         cap.release()
         cv2.destroyAllWindows()
-        sender.close()
+        if sender:
+            sender.close()
         print(stats.summary())
 
 
