@@ -4,6 +4,7 @@ import cv2
 import numpy as np
 from mediapipe.tasks.python import vision
 
+from body_packet import to_unity
 from hand_math import H_WRIST, H_MIDDLE_MCP, PALM_POINTS
 from stats import JOINT_NAMES, PANEL_JOINTS, WRISTS, TIMING_KEYS
 
@@ -97,7 +98,7 @@ class Renderer:
 
     # ---------- 그리기 ----------
 
-    def render(self, frame_shape, pose_result, hands, stats):
+    def render(self, frame_shape, pose_result, hands, stats, root):
         h, w = frame_shape[:2]
         canvas = np.zeros((h, w, 3), np.uint8)   # 항상 검은 배경
 
@@ -107,7 +108,7 @@ class Renderer:
                 self._draw_pose(canvas, pose_result.pose_landmarks[0], w, h)
             for hand in hands:
                 self._draw_hand(canvas, hand, w, h)
-            self._draw_panel(canvas, pose_result, hands, stats)
+            self._draw_panel(canvas, pose_result, hands, stats, root)
         else:
             self._draw_compact(canvas, hands, stats)
         self._draw_buttons(canvas, w)
@@ -163,8 +164,8 @@ class Renderer:
     def _timing_text(self, stats):
         return "  ".join(f"{k} {stats.time_ema[k]:.1f}ms" for k in TIMING_KEYS)
 
-    def _draw_panel(self, canvas, pose_result, hands, stats):
-        # 점검 패널: FPS, 처리 시간, 가시성, 손목 이동량, 손바닥 방향
+    def _draw_panel(self, canvas, pose_result, hands, stats, root):
+        # 점검 패널: FPS, 처리 시간, 가시성, 손목 이동량, 손바닥 방향, 루트 위치
         y = 70
         cv2.putText(canvas, f"FPS {stats.fps:.1f}", (20, y), FONT, 0.5, WHITE, 1)
         y += 20
@@ -190,6 +191,15 @@ class Renderer:
             else:
                 facing = "PALM FRONT" if z < 0 else "PALM BACK"
                 cv2.putText(canvas, f"{name:<11} {facing} {z:+.2f}", (20, y), FONT, 0.5, (0, 255, 0), 1)
+
+        # 루트 위치: 보내는 값과 같은 Unity 좌표 (z = -카메라까지 거리, 명세 01 §5.5)
+        y += 20
+        if root is None:
+            cv2.putText(canvas, f"{'root':<11} --", (20, y), FONT, 0.5, (0, 0, 255), 1)
+        else:
+            x, ry, z = to_unity(*root)
+            cv2.putText(canvas, f"{'root':<11} x {x:+.2f}  y {ry:+.2f}  z {z:+.2f} m",
+                        (20, y), FONT, 0.5, (0, 255, 0), 1)
 
     def _draw_compact(self, canvas, hands, stats):
         # 디버그 OFF: 상태만 간단히

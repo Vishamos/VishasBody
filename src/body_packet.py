@@ -1,4 +1,4 @@
-"""Body 프레임 패킷(1,080바이트) 인코딩. 기준: 명세 01 §4, 배치는 docs/protocol/README.md §2.
+"""Body 프레임 패킷(1,092바이트, 버전 2) 인코딩. 기준: 명세 01 §4, 배치는 docs/protocol/README.md §2.
 
 numpy 없이 표준 라이브러리만 쓴다(점 75개 규모라 충분히 빠르고, 테스트를 어느 PC에서나 돌리기 위해).
 """
@@ -9,20 +9,22 @@ import struct
 SIG_VISHAMOS = 11
 SIG_BODY = 31
 KIND_BODY_FRAME = 31
-VERSION = 1
+VERSION = 2
 
 FLAG_POSE = 1 << 0
 FLAG_LEFT_HAND = 1 << 1
 FLAG_RIGHT_HAND = 1 << 2
+FLAG_ROOT = 1 << 3
 
 POSE_POINTS = 33
 HAND_POINTS = 21
 HAND_WRIST = 0
 POSE_FLOATS = POSE_POINTS * 4             # x, y, z, visibility
 HAND_FLOATS = HAND_POINTS * 3 + 4         # x, y, z + 손바닥 쿼터니언
-FLOAT_COUNT = POSE_FLOATS + HAND_FLOATS * 2
+ROOT_FLOATS = 3                           # 루트 위치 x, y, z (맨 끝, 명세 01 §4.12)
+FLOAT_COUNT = POSE_FLOATS + HAND_FLOATS * 2 + ROOT_FLOATS
 
-# to, from, kind, version, flags, 예약 3바이트, seq, timestamp_ms, float 268개
+# to, from, kind, version, flags, 예약 3바이트, seq, timestamp_ms, float 271개
 PACKET_FORMAT = f"<BBBBB3xII{FLOAT_COUNT}f"
 PACKET_SIZE = struct.calcsize(PACKET_FORMAT)
 
@@ -98,17 +100,22 @@ def _hand_values(hand):
     return values
 
 
-def encode_frame(seq, timestamp_ms, pose_world, hands):
-    """한 프레임을 1,080바이트로.
+def encode_frame(seq, timestamp_ms, pose_world, hands, root=None):
+    """한 프레임을 1,092바이트로.
 
     pose_world: pose_world_landmarks[0] (33점) 또는 None
     hands: hand_math.HandState 목록 (is_left, world_landmarks, axes를 씀)
+    root: root_position.estimate_root 결과 (MediaPipe 카메라 축, 미터) 또는 None
     """
     flags = 0
     pose = [0.0] * POSE_FLOATS
     left = [0.0] * HAND_FLOATS
     right = [0.0] * HAND_FLOATS
+    root_values = [0.0] * ROOT_FLOATS
 
+    if root is not None:
+        flags |= FLAG_ROOT
+        root_values = to_unity(*root)
     if pose_world:
         flags |= FLAG_POSE
         pose = _pose_values(pose_world)
@@ -122,4 +129,4 @@ def encode_frame(seq, timestamp_ms, pose_world, hands):
             right = _hand_values(hand)
 
     return struct.pack(PACKET_FORMAT, SIG_VISHAMOS, SIG_BODY, KIND_BODY_FRAME, VERSION, flags,
-                       seq, timestamp_ms, *pose, *left, *right)
+                       seq, timestamp_ms, *pose, *left, *right, *root_values)

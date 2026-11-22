@@ -11,6 +11,7 @@ import mediapipe as mp
 from body_packet import encode_frame
 from hand_math import analyze_hands
 from renderer import Renderer
+from root_position import DEFAULT_FOV_DEG, estimate_root, focal_px
 from stats import TrackingStats
 from synapse_sender import SynapseSender
 from trackers import HandTracker, PoseTracker
@@ -18,7 +19,7 @@ from trackers import HandTracker, PoseTracker
 ROOT_DIR = Path(__file__).resolve().parent.parent   # 프로젝트 폴더. 어느 폴더에서 실행해도 찾도록
 POSE_MODEL = ROOT_DIR / "models" / "pose_landmarker_full.task"
 HAND_MODEL = ROOT_DIR / "models" / "hand_landmarker.task"
-CONFIG_FILE = ROOT_DIR / "config" / "config.local.json"   # PC별 서버 주소 (git 제외, config.example.json 참고)
+CONFIG_FILE = ROOT_DIR / "config" / "config.local.json"   # PC별 서버 주소·카메라 화각 (git 제외, config.example.json 참고)
 
 
 def timed(fn, *args):
@@ -28,10 +29,10 @@ def timed(fn, *args):
     return result, time.perf_counter() - t
 
 
-def load_server_url():
+def load_config():
     if not CONFIG_FILE.exists():
-        return None
-    return json.loads(CONFIG_FILE.read_text(encoding="utf-8"))["server_url"]
+        return {}
+    return json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
 
 
 def main():
@@ -49,7 +50,10 @@ def main():
         return
 
     cap = cv2.VideoCapture(args.camera, cv2.CAP_DSHOW)
-    server_url = load_server_url()
+    config = load_config()
+    server_url = config["server_url"] if config else None
+    fov_deg = config.get("camera_fov_deg", DEFAULT_FOV_DEG)
+    focal = None            # 첫 프레임 해상도로 한 번 계산 (명세 01 §5.3)
     if server_url is None:
         print("[송신] config 폴더에 config.local.json이 없어 보내지 않고 트래킹만 합니다 "
               "(config.example.json을 복사해 server_url을 고치면 송신)")
@@ -70,6 +74,10 @@ def main():
                 if not ok:
                     break
                 stats.begin_frame()
+                height, width = frame.shape[:2]
+                if focal is None:
+                    focal = focal_px(width, height, fov_deg)
+                    print(f"[루트] 해상도 {width}x{height}, 대각선 화각 {fov_deg}°")
 
                 rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
@@ -96,18 +104,19 @@ def main():
                     hands = analyze_hands(hand_result, hand_pose_pts)
                 if hand_started:
                     hand_pose_pts = pose_pts
+                pose_world = pose_result.pose_world_landmarks[0] if pose_result.pose_world_landmarks else None
+                root = estimate_root(pose_pts, pose_world, width, height, focal)
 
                 if sender:
                     # seq는 패킷을 만들 때마다 올림: 송신 스레드가 버린 프레임은 받는 쪽에서 건너뜀으로 보임
                     seq += 1
-                    pose_world = pose_result.pose_world_landmarks[0] if pose_result.pose_world_landmarks else None
-                    sender.send(encode_frame(seq, timestamp_ms, pose_world, hands))
+                    sender.send(encode_frame(seq, timestamp_ms, pose_world, hands, root))
 
                 stats.update(pose_result, hands)
 
                 # 화면 (그리기 + 창 갱신 + 키 입력 대기 시간 포함)
                 t3 = time.perf_counter()
-                renderer.render(frame.shape, pose_result, hands, stats)
+                renderer.render(frame.shape, pose_result, hands, stats, root)
                 key = cv2.waitKey(1) & 0xFF
                 stats.add_time("draw", time.perf_counter() - t3)
                 if not renderer.handle_key(key):

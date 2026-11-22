@@ -75,7 +75,7 @@
 | 1.1 손 비동기 | 완료 (`main.py`). 손 추론을 50ms로 늦춘 가짜 카메라 스모크에서 프레임 간격이 손을 기다리지 않음 확인. 송출 PC + Unity 실행 중 FPS 29.9∼31.0, 손 있을 때 pose 25∼26 / hand 27∼28 / infer 25∼27 / draw 3.7ms (2026-11-22). 카메라 버퍼 1장 설정(`CAP_PROP_BUFFERSIZE`)은 이 웹캠에서 무시되어 제거 | `18527d5` |
 | 1.5 | 보류 (Track-1 측정 대기) | |
 | 3.1∼3.4 | 완료 (`synapse_sender.py`, `main.py`). 가짜 서버로 등록·송신·재접속 확인, 실제 서버 연동 확인 전 | Send-2 커밋 |
-| 4.1∼4.10 | 버전 1 완료 (`body_packet.py`, `test/test_body_packet.py`). 버전 2 변경(4.1·4.2·4.4)은 미구현 | Send-1 커밋 |
+| 4.1∼4.10 | 완료 (`body_packet.py`, `test/test_body_packet.py`). 버전 2 변경(4.1·4.2·4.4)은 Track-5 | Send-1 커밋, Track-5 커밋 |
 | 4.11 | 보류 | |
-| 4.12, 5.1∼5.5 | 미구현 (Track-5) | |
-| 5.6 | 사용자 보정 대기 (Track-5 구현 후) | |
+| 4.12, 5.1∼5.5 | 완료 (`root_position.py`, `body_packet.py`, `main.py`, `renderer.py`, `test/test_root_position.py`). 알려진 위치로 투영한 점에서 위치 복원 확인, 가짜 카메라 스모크에서 패킷 1,092바이트·flags bit3·디버그 표시 확인. 계산 0.06ms/프레임. 실제 웹캠 확인 전 | Track-5 커밋 |
+| 5.6 | 사용자 보정 대기 | |

@@ -1,4 +1,4 @@
-"""Body 패킷 인코딩 테스트. 기대값은 명세 01 §4와 docs/protocol/README.md §2∼4에서 가져온다."""
+"""Body 패킷 인코딩 테스트. 기대값은 명세 01 §4·§5와 docs/protocol/README.md §2∼4에서 가져온다."""
 import math
 import struct
 import sys
@@ -10,8 +10,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 from body_packet import encode_frame  # noqa: E402
 
 # 프로토콜 §2 배치
-SIZE = 1080
-POSE_OFS, LEFT_OFS, RIGHT_OFS = 16, 544, 812
+SIZE = 1092
+POSE_OFS, LEFT_OFS, RIGHT_OFS, ROOT_OFS = 16, 544, 812, 1080
 
 
 def floats(data, offset, count):
@@ -48,17 +48,17 @@ def rotate(q, v):
 
 class HeaderTest(unittest.TestCase):
     def test_size_is_fixed(self):
-        cases = [(None, []), (make_pose(), []), (None, [make_hand(True)]),
-                 (make_pose(), [make_hand(True), make_hand(False)])]
-        for pose, hands in cases:
-            self.assertEqual(len(encode_frame(1, 0, pose, hands)), SIZE)
+        cases = [(None, [], None), (make_pose(), [], None), (None, [make_hand(True)], None),
+                 (make_pose(), [make_hand(True), make_hand(False)], (0.1, 0.2, 1.5))]
+        for pose, hands, root in cases:
+            self.assertEqual(len(encode_frame(1, 0, pose, hands, root)), SIZE)
 
     def test_header_bytes(self):
         data = encode_frame(7, 123456, None, [])
         self.assertEqual(data[0], 11)       # to Vishamos
         self.assertEqual(data[1], 31)       # from Body
         self.assertEqual(data[2], 31)       # kind
-        self.assertEqual(data[3], 1)        # version
+        self.assertEqual(data[3], 2)        # version
         self.assertEqual(data[5:8], b"\x00\x00\x00")
         self.assertEqual(struct.unpack_from("<II", data, 8), (7, 123456))
 
@@ -78,6 +78,9 @@ class FlagsTest(unittest.TestCase):
         self.assertEqual(encode_frame(1, 0, None, [make_hand(True)])[4], 0b010)
         self.assertEqual(encode_frame(1, 0, None, [make_hand(False)])[4], 0b100)
         self.assertEqual(encode_frame(1, 0, make_pose(), [make_hand(False), make_hand(True)])[4], 0b111)
+        self.assertEqual(encode_frame(1, 0, None, [], (0, 0, 1))[4], 0b1000)
+        self.assertEqual(encode_frame(1, 0, make_pose(), [make_hand(False), make_hand(True)], (0, 0, 1))[4],
+                         0b1111)
 
     def test_only_left_hand_leaves_others_zero(self):
         data = encode_frame(1, 0, None, [make_hand(True)])
@@ -107,6 +110,25 @@ class CoordinateTest(unittest.TestCase):
             self.assertEqual(f[0:3], (0.0, 0.0, 0.0))
             for j in (1, 9, 20):
                 self.assertEqual(f[j * 3:j * 3 + 3], (-j / 64, -2 * j / 64, -3 * j / 64))
+
+
+class RootTest(unittest.TestCase):
+    def test_root_at_end_converted_to_unity(self):
+        # 카메라 기준 (0.25, -0.5, 1.5) -> Unity (-0.25, 0.5, -1.5), 오프셋 1080 (프로토콜 §2, §3.3)
+        data = encode_frame(1, 0, make_pose(), [make_hand(True)], (0.25, -0.5, 1.5))
+        self.assertEqual(floats(data, ROOT_OFS, 3), (-0.25, 0.5, -1.5))
+
+    def test_root_does_not_move_other_offsets(self):
+        # 버전 1 배치(0~1079)는 루트 유무와 관계없이 같다 (명세 01 §4.12)
+        pose, hands = make_pose(), [make_hand(True), make_hand(False)]
+        with_root = encode_frame(3, 9, pose, hands, (0.25, -0.5, 1.5))
+        without = encode_frame(3, 9, pose, hands)
+        self.assertEqual(with_root[5:ROOT_OFS], without[5:ROOT_OFS])
+
+    def test_no_root_is_zero(self):
+        data = encode_frame(1, 0, make_pose(), [])
+        self.assertEqual(data[4] & 0b1000, 0)
+        self.assertEqual(data[ROOT_OFS:], bytes(12))
 
 
 class PalmQuaternionTest(unittest.TestCase):
