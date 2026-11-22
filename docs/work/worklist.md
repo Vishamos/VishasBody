@@ -1,8 +1,8 @@
 # 작업 목록
 
-> **현재 진행 (2026-11-22):** 명세 01·프로토콜 확정(사용자 승인). 송신 구현 시작.
+> **현재 진행 (2026-11-22):** Send-1 패킷 인코딩 완료. 다음은 Send-2 송신 계층.
 > **다음 할 일:**
-> 1. Send-1 → Send-2 (패킷 인코딩 → WebSocket 송신), Doc-1은 Send-2와 같이
+> 1. Send-2 (WebSocket 송신, `body_packet.encode_frame` 연결), Doc-1은 Send-2와 같이
 > 2. 그 사이 사용자가 할 수 있는 것: Track-1 정지 떨림 측정 (웹캠 필요)
 
 ## 운영 방식
@@ -21,7 +21,6 @@
 - [ ] Doc-1 README를 새 구조에 맞게 정리: 12번 옛 서버 요약(서버가 먼저 `[0,0]` 인사, deviceType 10·30) 폐기 → `docs/protocol`·Synapse 규약 참조로, 6번 송신 데이터를 명세 01 참조로, 10번 설계 메모 삭제(명세로 옮겨짐), 3번 환경(PC별 경로·Python) 정정, `requirements.txt` 추가(실행 PC 확인 버전: Python 3.12.10, mediapipe 1.2.0, opencv-python 5.0.0.93), 4번 실행 방법에 "실행 PC는 git pull 후 실행, 개발 PC(Python 3.15)는 단위 테스트만" 추가 — 기획: 없음 / 명세: 01
 
 ## Send. 송신
-- [ ] Send-1 패킷 인코딩 모듈: Unity 좌표 변환, 손바닥 쿼터니언(LookRotation 정의), 1,080바이트 패킹 + `test/` 단위 테스트(크기, 헤더, flags, 0 채움, 좌표 변환, 쿼터니언) — 기획: `[Body-Packet]` / 명세: 01 §4
 - [ ] Send-2 `udp_sender.py`를 WebSocket 송신 계층으로 교체: 등록 → 송신, 재접속·재등록, 송신 스레드, 서버 주소 설정 파일. 의존성 1개 추가 승인 필요 — 기획: `[Body-Send]`, `[Body-Send-Register]` / 명세: 01 §3
 
 ## Track. 트래킹
