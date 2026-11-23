@@ -53,20 +53,29 @@ class EstimateRootTest(unittest.TestCase):
         near = estimate_root(project(world, (0, 0, 1.0)), world, W, H, F)
         self.assertLess(near[2], far[2])
 
-    def test_legs_are_ignored(self):
-        # 다리(25~32)는 보이는 것으로 나와도 쓰지 않는다 (§5.1)
+    def test_arms_and_legs_are_ignored(self):
+        # 팔(13~22)·다리(25~32)는 보이는 것으로 나와도 쓰지 않는다 (§5.1)
         world = make_world()
         t = (0.1, -0.2, 1.5)
         pts = project(world, t)
-        for i in range(25, 33):
+        for i in (*range(13, 23), *range(25, 33)):
             pts[i].x, pts[i].y = 0.0, 0.0      # 엉뚱한 위치
+        self.assertVecAlmostEqual(estimate_root(pts, world, W, H, F), t)
+
+    def test_wrong_arm_depth_does_not_move_root(self):
+        # 카메라 쪽으로 뻗은 팔의 월드 깊이가 틀려도 루트는 그대로 (실측 문제, §5.1)
+        world = make_world()
+        t = (0.1, -0.2, 1.5)
+        pts = project(world, t)
+        for i in range(13, 23):
+            world[i].z -= 0.3
         self.assertVecAlmostEqual(estimate_root(pts, world, W, H, F), t)
 
     def test_low_visibility_points_are_ignored(self):
         world = make_world()
         t = (0.1, -0.2, 1.5)
         pts = project(world, t, visible=range(0, 10))
-        for i in range(10, 25):
+        for i in (10, 11, 12, 23, 24):
             pts[i].x, pts[i].y = 0.0, 0.0      # 가려진 점은 값이 틀려도 무관
             pts[i].visibility = 0.49
         self.assertVecAlmostEqual(estimate_root(pts, world, W, H, F), t)
