@@ -53,6 +53,7 @@
    ```
    - 없으면 보내지 않고 트래킹만 합니다. 서버가 꺼져 있으면 2초마다 다시 접속합니다.
    - `camera_fov_deg`: 웹캠 대각선 화각(도, 없으면 72). 루트 위치 거리 계산에 씁니다. 보정 방법은 명세 01 §5.6.
+     실행 PC(RPC-20F)는 **60**(보정값, 예상 해상도 640×480: 16:9 센서의 양옆을 잘라낸 4:3). 해상도가 바뀌면 다시 보정합니다.
 
 - 패키지는 `BodyTracker.bat`이 빠진 것이 있을 때 `requirements.txt`대로 자동 설치합니다(실행할 Python과 같은 Python에 설치). 직접 설치하려면 `py -3.12 -m pip install -r requirements.txt`.
 - 옵션: `BodyTracker.bat --debug`(디버그 화면으로 시작), `--camera 1`(카메라 번호)
