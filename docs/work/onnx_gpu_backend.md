@@ -1,0 +1,116 @@
+# ONNX GPU 백엔드 추가 기록 (2026-11-24)
+
+> 실행 PC(웹캠 PC)에서 사용자 요청으로 다른 Claude Code 세션이 작업한 내용이다. 프로젝트 세션이 상황을 파악하도록 정리한다.
+> **커밋 전 상태로 작성됐다.** 이 문서와 아래 코드 변경이 커밋·푸시됐는지 `git log`로 확인할 것.
+
+## 1. 요약
+
+- MediaPipe 모델(`.task`)을 ONNX로 변환해 **ONNX Runtime + DirectML(GPU, GTX 1060)** 로 실행하는 트래커를 추가했다.
+- 실행 시 고른다. **기본값은 기존 MediaPipe(CPU)라서 옵션 없이 실행하면 예전과 같다.**
+  | 실행 | 방식 |
+  |---|---|
+  | `BodyTracker.bat` | 기존: MediaPipe, CPU |
+  | `BodyTrackerGPU.bat` (= `BodyTracker.bat --backend onnx`) | 새 방식: ONNX, GPU |
+- 결과 객체 모양을 MediaPipe와 똑같이 맞춰서 `hand_math`·`stats`·`renderer`·`body_packet`·`root_position`은 고치지 않았다. **패킷 형식이 같아 받는 쪽(Vishamos)은 바꿀 것이 없다.**
+- 사용자 지시: 이번 작업은 프로젝트 `CLAUDE.md` 규칙을 적용하지 않고 진행했다(아래 6번 "기존 규칙·문서와 충돌" 참고).
+
+## 2. 왜 했나
+
+- Windows용 MediaPipe는 GPU가 빌드에서 빠져 있다(`GPU processing is disabled in build flags`, 실행 PC에서 직접 확인). 그래서 MediaPipe 대신 ONNX Runtime으로 신경망만 GPU에서 돌리고, MediaPipe가 하던 전후 처리를 Python으로 다시 구현했다.
+- 실행 PC 실측(640x480, 웹캠 최대 30 FPS. 카메라 자체가 30에서 막힘, 60 요청도 30으로 나옴):
+  | 구성 (MediaPipe CPU) | FPS | 추론 평균 | p95 |
+  |---|---|---|---|
+  | full 포즈만 | 30.1 (카메라가 상한) | 20.3 ms | 24.3 ms |
+  | full + 손 (손이 보일 때) | **28.4** | 31.6 ms | 45.6 ms |
+  | heavy + 손 | 12.4 | 77.7 ms | 86.0 ms |
+- **손이 보이면 full + 손 구성도 30 FPS(33ms 예산)를 지키지 못했다.** 병목이 카메라가 아니라 추론이다.
+
+## 3. 바뀐 파일
+
+| 파일 | 내용 |
+|---|---|
+| `src/onnx_trackers.py` (새 파일) | `OnnxPoseTracker`, `OnnxHandTracker`. MediaPipe Tasks(VIDEO 모드)와 같은 결과 모양(`pose_landmarks`, `pose_world_landmarks`, `hand_landmarks`, `hand_world_landmarks`, `handedness[k][0].category_name`) |
+| `src/main.py` | `--backend {mediapipe,onnx}` 옵션(기본 mediapipe), ONNX 모델 경로 `ONNX_MODELS`, 모델이 없으면 안내 후 종료. 시작할 때 `[추론] ...` 출력 |
+| `BodyTracker.bat` | 패키지 확인 목록에 `onnxruntime` 추가 (없으면 requirements 설치) |
+| `BodyTrackerGPU.bat` (새 파일) | `BodyTracker.bat --backend onnx` 호출, 다른 인자도 넘김 |
+| `requirements.txt` | `onnxruntime-directml==1.24.4` 추가 |
+| `.gitignore` | `*.onnx` 추가 |
+| `tools/convert_onnx.py` (새 파일) | `.task` → ONNX 모델 변환 (8번) |
+| `test/test_onnx_geometry.py` (새 파일) | 앵커 수(2254·2016), 영역 회전·이동, 크롭↔투영 왕복, 가중 NMS, OneEuro 필터. 모델 없이 실행됨. 기존 테스트 포함 40개 통과 |
+| `models/*.onnx` (git 제외) | `pose_detector`, `pose_landmarks_full`, `pose_landmarks_heavy`, `hand_detector`, `hand_landmarks` |
+
+## 4. 구현 구조 (`src/onnx_trackers.py`)
+
+- **포즈**: 검출(입력 224, 값 범위 [-1, 1], 레터박스) → SSD 앵커 2254개(stride 8/16/32/32/32) 디코딩 → 가중 NMS(IoU 0.3) → 키포인트 0→1로 회전 정사각 영역(한 변 = 거리 x 2 x 1.25) → 관절 모델(입력 256, [0, 1], 가장자리 복제) → 39점(33 + 보조 6) → 히트맵 보정(7x7, 신뢰도 0.5 이상) → 원본 좌표로 투영 → 스무딩 → 보조점 33·34로 다음 프레임 영역. 존재 점수(이미 sigmoid 적용) 0.5 미만이면 다음 프레임에 다시 검출
+- **손**: 추적 중인 손이 2개보다 적으면 매 프레임 손바닥 검출(입력 192, [0, 1], 앵커 2016개, stride 8/16/16/16) → 영역(배율 2.6, 위로 0.5 이동) → 관절 모델(입력 224) → 21점 → 투영 → 스무딩 → 관절로 다음 영역(배율 2.0, 위로 0.1 이동). 새 손바닥이 추적 중인 손과 IoU 0.5 넘게 겹치면 무시
+- **좌우 라벨**: 손 좌우 출력(sigmoid 값) > 0.5 → `"Right"`. MediaPipe와 비교해 97~99% 일치 확인
+- **월드 좌표**: 영역 회전만큼 x, y를 되돌림(검증: 회전 보정을 빼면 MediaPipe와 차이가 커짐)
+- **가정한 값 (MediaPipe 공개 그래프 설정을 기억에 의존해 넣음, 원본 설정 파일과 대조 안 함)**:
+  스무딩 OneEuro — 이미지 좌표 min_cutoff 0.05 / beta 80, 보조점 0.01 / 10, 월드 0.1 / 40(크기 정규화 없음), 가시성 저역 필터 alpha 0.1. 손 영역 배율·이동값. 비교 결과는 좋지만 값 자체는 미검증
+
+## 5. 검증 결과 (실행 PC, 실제 웹캠, 같은 프레임을 두 방식에 넣어 비교)
+
+**처리 시간 (같은 스레드에서 차례로 실행)**
+| | MediaPipe CPU | ONNX GPU |
+|---|---|---|
+| 포즈 | 23 ms | **10 ms** |
+| 손 (손이 보일 때) | 28~31 ms | **13~14 ms** |
+
+**MediaPipe와의 일치도**
+| 항목 | 결과 |
+|---|---|
+| 포즈 검출 | 726/726 프레임 일치 |
+| 포즈 화면 좌표 차이 (상반신) | 평균 4~7 px |
+| 가시성 차이 | 평균 0.001~0.007 |
+| 포즈 월드 좌표 차이 | 평균 27~33 mm. 대부분 프레임마다 흔들리는 잡음(편향은 약 7~10 mm). 월드 좌표가 크롭 영역에 매우 민감해서 생기는 차이로, MediaPipe 자체 떨림(아래)과 같은 크기 |
+| 손 검출 수 | 338 대 337 (다른 실행에서는 165 대 185) |
+| 손 화면 좌표 차이 | 평균 2.8~4.7 px |
+| 손 월드 좌표 차이 | 평균 7~10 mm |
+
+**떨림과 지연** (STILL 10초 가만히 → MOVE 10초 팔 흔들기, 기준 = 스무딩 없는 모델 출력)
+| | 정지 떨림 화면 | 정지 떨림 월드 | 움직임 지연 | 움직임 크기 비율 (화면/월드) |
+|---|---|---|---|---|
+| MediaPipe | 6.6 px/프레임 | 18.0 mm/프레임 | 0프레임 | 0.91 / 0.83 |
+| ONNX | **4.8 px/프레임** | **8.7 mm/프레임** | 0프레임 | 0.94 / 0.81 |
+
+- ONNX가 떨림은 더 적고 지연·추종은 같다. 단 지연은 프레임(33ms) 단위로만 쟀다.
+- 이 수치는 worklist **Track-1 정지 떨림 측정**의 첫 측정값으로 쓸 수 있다(어깨·팔꿈치·손목 11~16, 프레임 간 이동량).
+
+## 6. 기존 규칙·문서와 충돌 (프로젝트 세션이 정리할 것)
+
+| 위치 | 현재 내용 | 충돌 |
+|---|---|---|
+| `CLAUDE.md` 안전 규칙 3 | "Windows용 MediaPipe에는 GPU 지원이 없다. GPU 위임을 제안하지 않는다" | MediaPipe GPU 위임은 아니지만, GPU 사용 경로가 생김 |
+| `CLAUDE.md` 안전 규칙 1 | 카메라 영상을 어떤 창에도 표시하지 않음 | 작업 중 측정 스크립트 하나(`live_bench_hand.py`, `.temp`)가 카메라 영상 미리보기 창을 띄웠다(규칙을 읽기 전). 이후 측정은 글자만 있는 신호 창 사용 |
+| `CLAUDE.md` 안전 규칙 8, 9 | 웹캠 사용은 사용자가, 의존성 추가는 승인 후 | 사용자 요청·승인으로 세션이 직접 웹캠 측정, `onnxruntime-directml` 설치 |
+| README 7번 "GPU 사용 안 함" | "GTX 1060은 Unity + OBS가 써야 함" | 선택 옵션으로 GPU 사용 가능해짐. 기본값은 CPU 유지 |
+| README 5번 파일 구성, 4번 실행 방법 | `onnx_trackers.py`, `BodyTrackerGPU.bat`, ONNX 모델 없음 | 추가 필요 |
+| `docs/work/worklist.md` | 이 작업 항목 없음 | 남은 일(7번) 반영 필요 |
+
+## 7. 남은 일 / 확인 안 된 것
+
+- [ ] `BodyTrackerGPU.bat --debug`로 실제 트래커 실행: FPS 30 유지, 종료 요약 비교 (사용자, 실행 PC)
+- [ ] **Unity + OBS를 켠 상태**에서 GPU 공유 시 속도 (모든 GPU 수치는 GPU가 한가할 때 측정)
+- [ ] 가정한 필터 계수·영역 배율을 MediaPipe 원본 그래프 설정과 대조
+- [ ] heavy 관절 모델은 변환만 함(`models/pose_landmarks_heavy.onnx`, GPU 단독 약 21 ms). `main.py`에 연결 안 함
+- [ ] 다른 PC에서 쓰려면 `models/*.onnx`를 복사하거나 `tools/convert_onnx.py`로 변환 (git 제외, 변환에는 TensorFlow 환경 필요)
+- [ ] README '실행 방법'의 모델 내려받기에 heavy `.task`가 없음 (heavy를 쓸 때만 필요)
+
+## 8. 모델 변환 (`tools/convert_onnx.py`)
+
+- **전제: `models/`에 `.task`가 있어야 한다.** `pose_landmarker_full.task`, `hand_landmarker.task` 필수, `pose_landmarker_heavy.task`는 선택(없으면 건너뜀)
+- 변환용 가상환경(TensorFlow + tf2onnx + onnxruntime)이 따로 필요하다. 트래커 실행 환경(`requirements.txt`)에는 넣지 않는다. 만드는 명령은 스크립트 첫 주석에 있다. 경로가 길면 TensorFlow 설치가 Windows 경로 길이 제한에 걸리므로 짧은 경로에 만든다(실행 PC: `C:/Users/baewh/.rea_gpu`, TensorFlow 2.21 + tf2onnx 1.17)
+- 실행: `<가상환경>/Scripts/python -I tools/convert_onnx.py` (프로젝트 폴더에서)
+- `.task`는 ZIP이고 안에 `.tflite` 두 개가 있다. full과 heavy의 `pose_detector.tflite`는 같은 파일이다.
+- `pose_detector.tflite`는 희소 가중치 + `DENSIFY` 연산 38개를 써서 tf2onnx가 실패한다. TFLite로 DENSIFY 결과를 미리 계산해 상수로 넣고 연산을 지운 뒤 변환한다. **이때 XNNPACK을 끄지 않으면(`BUILTIN_WITHOUT_DEFAULT_DELEGATES`) 계산되지 않은 값이 읽혀 결과가 틀린다.**
+- 변환 후 원본 TFLite와 출력을 비교한다. 최대 상대 오차 1.3e-6 ~ 1.4e-4 (FP16 가중치 반올림 수준).
+
+## 9. `.temp/`에 있는 보조 스크립트 (git 제외, 실행 PC에만 있음)
+
+| 파일 | 용도 |
+|---|---|
+| `compare_backends.py` | 같은 프레임으로 두 방식 비교 (차이, 검출 수, 시간). `--cpu`로 ONNX를 CPU 실행 |
+| `still_move_test.py` | 정지 떨림 + 움직임 지연 측정 |
+| `diagnose_pose_world.py` | 포즈 월드 좌표 차이 진단 (편향/잡음, 영역 배율·회전 변형) |
+| `cue.py` | 측정 시작·끝 알림: 소리(PlaySound) + 글자만 있는 신호 창. `winsound.Beep`은 이 PC에서 안 들림 |
+| `rea_gpu/` | 초기 분석(모델 구조 파싱, 벤치마크) 스크립트와 결과 |

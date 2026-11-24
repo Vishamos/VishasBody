@@ -19,6 +19,9 @@ from trackers import HandTracker, PoseTracker
 ROOT_DIR = Path(__file__).resolve().parent.parent   # 프로젝트 폴더. 어느 폴더에서 실행해도 찾도록
 POSE_MODEL = ROOT_DIR / "models" / "pose_landmarker_full.task"
 HAND_MODEL = ROOT_DIR / "models" / "hand_landmarker.task"
+# --backend onnx: tools/convert_onnx.py로 변환한 모델, ONNX Runtime DirectML(GPU)로 실행
+ONNX_MODELS = {name: ROOT_DIR / "models" / f"{name}.onnx"
+               for name in ("pose_detector", "pose_landmarks_full", "hand_detector", "hand_landmarks")}
 CONFIG_FILE = ROOT_DIR / "config" / "config.local.json"   # PC별 서버 주소·카메라 화각 (git 제외, config.example.json 참고)
 
 
@@ -42,12 +45,27 @@ def main():
     parser = argparse.ArgumentParser(description="웹캠 상반신 + 손 트래킹 -> VishaSynapse 송신")
     parser.add_argument("--debug", action="store_true", help="디버그 화면으로 시작 (실행 중 d 키로 전환)")
     parser.add_argument("--camera", type=int, default=0, help="카메라 번호")
+    parser.add_argument("--backend", choices=("mediapipe", "onnx"), default="mediapipe",
+                        help="추론 방식: mediapipe(CPU, 기본) / onnx(ONNX Runtime DirectML GPU)")
     args = parser.parse_args()
 
     missing = [p.name for p in (POSE_MODEL, HAND_MODEL) if not p.exists()]
     if missing:
         print(f"[모델] models 폴더에 {', '.join(missing)}이 없습니다. README '실행 방법'의 명령으로 내려받으세요")
         return
+    if args.backend == "onnx":
+        missing = [p.name for p in ONNX_MODELS.values() if not p.exists()]
+        if missing:
+            print(f"[모델] models 폴더에 {', '.join(missing)}이 없습니다. tools/convert_onnx.py로 변환하세요")
+            return
+        from onnx_trackers import OnnxHandTracker, OnnxPoseTracker
+        pose_tracker = OnnxPoseTracker(ONNX_MODELS["pose_detector"], ONNX_MODELS["pose_landmarks_full"])
+        hand_tracker = OnnxHandTracker(ONNX_MODELS["hand_detector"], ONNX_MODELS["hand_landmarks"])
+        print(f"[추론] ONNX Runtime: {pose_tracker.providers[0]}")
+    else:
+        pose_tracker = PoseTracker(POSE_MODEL)
+        hand_tracker = HandTracker(HAND_MODEL)
+        print("[추론] MediaPipe (CPU)")
 
     cap = cv2.VideoCapture(args.camera, cv2.CAP_DSHOW)
     config = load_config()
@@ -67,8 +85,7 @@ def main():
     hands = []              # 최신 완료 손 결과
 
     try:
-        with PoseTracker(POSE_MODEL) as pose_tracker, HandTracker(HAND_MODEL) as hand_tracker, \
-                ThreadPoolExecutor(max_workers=2) as pool:
+        with pose_tracker, hand_tracker, ThreadPoolExecutor(max_workers=2) as pool:
             while cap.isOpened():
                 ok, frame = cap.read()
                 if not ok:

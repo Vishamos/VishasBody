@@ -177,6 +177,8 @@ cython_debug/
 
 # MediaPipe 모델 (README "실행 방법"에서 내려받음)
 *.task
+# ONNX 변환 모델 (tools/convert_onnx.py로 만듦)
+*.onnx
 
 # Claude Code / 개발 임시
 .temp/
