@@ -103,7 +103,7 @@
 | 상반신만 사용 | 방송 자세 (앉아서 책상 앞) |
 | **Hand Landmarker 추가** | Pose 모델의 손 점(검지·새끼)으로는 손 뒤집기(앞/뒤)가 판별되지 않았음. Hand 21점으로는 `PALM FRONT/BACK` 정상 판별 확인 |
 | **Pose와 Hand 병렬 실행**, 몸은 손을 기다리지 않음 | 순차 실행 시 약 20 FPS. 병렬로 30 근처, 손이 보이면 손 추론이 프레임을 붙잡아 25로 떨어져 손은 최신 완료 결과를 씀 (명세 01 §1.1) |
-| **GPU는 선택(ONNX 백엔드), 기본은 CPU** | Windows용 MediaPipe는 GPU가 빌드에서 빠져 있음 (`GPU processing is disabled in build flags`). 모델을 ONNX로 바꿔 DirectML로 돌리면 포즈 23 → 10ms, 손 28∼31 → 13∼14ms. 다만 GTX 1060은 Unity + OBS도 쓰므로, 함께 켰을 때 측정 전까지 기본값은 CPU |
+| **GPU는 선택(ONNX 백엔드), 기본은 CPU** | Windows용 MediaPipe는 GPU가 빌드에서 빠져 있음 (`GPU processing is disabled in build flags`). 모델을 ONNX로 바꿔 DirectML로 돌리면 포즈 23 → 10ms, 손 28∼31 → 13∼14ms. 방송 중(OBS + Vishamos)에도 30 FPS, OBS 손실 프레임 0 확인(2026-11-24). 기본값 전환은 결정 대기 |
 | **목표: 30 FPS 유지** | 프레임 예산 약 33ms. 새 기능은 이 안에 들어가는지 먼저 확인 |
 | 몸통은 **어깨선 위주**로 계산하는 게 적합 (받는 쪽 참고) | 앉은 자세에서 골반 가시성 **0.00** (책상에 가려 MediaPipe가 추측한 값) |
 | 트래커는 **트래킹 + 연결·송신만** 담당 | 역할 분리. 송신 방식은 송신 계층에서만 바꿈 |
@@ -114,8 +114,9 @@
 | 백엔드 | FPS | 처리 시간 | 비고 |
 |---|---|---|---|
 | MediaPipe (CPU) | 29.9∼31.0 (손 있을 때 28.4) | 손 있을 때 pose 25∼26 / hand 27∼28 / infer 25∼27 / draw 3.7ms | 2026-11-22∼24, Unity 실행 중 |
-| ONNX (GPU) | 28.5 | pose 13.7 / hand 17.1 / infer 13.9 / draw 3.9ms | 2026-11-24, 640×480, GPU가 한가할 때. Unity + OBS와 함께는 미측정 |
+| ONNX (GPU) | 28.5 | pose 13.7 / hand 17.1 / infer 13.9 / draw 3.9ms | 2026-11-24, 640×480, GPU가 한가할 때(평균 FPS 계산 수정 전 값) |
 | ONNX (GPU), 1024×576 | 29.4 | pose 14.3 / hand 18.5 / infer 14.5 / draw 3.5ms | 2026-11-24. 손을 쓰는 실행에서 손 검출 74∼80%(640×480과 비슷) |
+| ONNX (GPU), 1024×576, **방송 중** | 30.0 | pose 14.8 / hand 22.3 / infer 15.0 / draw 2.8ms | 2026-11-24, OBS + Vishamos + 송신. OBS 손실 프레임 0, 렌더링 60/60 FPS |
 
 - 가시성(앉은 자세): 어깨 1.00 / 팔꿈치·손목 0.4∼0.9(팔을 내리면 화면 밖이라 낮음) / 골반 0.00
 - 정지 떨림(월드 좌표, 스무딩 없는 모델 출력 기준 비교): MediaPipe 18.0, ONNX 8.7mm/프레임. 자세한 내용은 `docs/work/onnx_gpu_backend.md` 5번
