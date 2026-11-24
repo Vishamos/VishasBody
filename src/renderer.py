@@ -64,6 +64,7 @@ class Renderer:
         self.state = {"debug": debug, "mirror": mirror}   # mirror는 화면 표시에만 적용
         self._rects = {}
         self._quit_requested = False
+        self._raised = False     # 첫 표시 때 한 번만 맨 앞으로 (명세 01 §2.4)
         cv2.namedWindow(self.window)
         cv2.setMouseCallback(self.window, self._on_mouse)
 
@@ -114,6 +115,11 @@ class Renderer:
         self._draw_buttons(canvas, w)
 
         cv2.imshow(self.window, canvas)
+        if not self._raised:
+            # 맨 위 고정을 켰다 바로 끄면 창이 맨 앞으로 올라온 채 일반 창이 됨 (방송 중 OBS 등을 계속 가리지 않게)
+            cv2.setWindowProperty(self.window, cv2.WND_PROP_TOPMOST, 1)
+            cv2.setWindowProperty(self.window, cv2.WND_PROP_TOPMOST, 0)
+            self._raised = True
 
     def _to_screen(self, x, y, w, h):
         sx = 1.0 - x if self.state["mirror"] else x

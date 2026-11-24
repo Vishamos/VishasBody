@@ -22,3 +22,4 @@
 - (2026-11-23) `[Body-Packet-Header]` 크기 1,080 → 1,092바이트, 버전 1 → 2 (위 항목 때문)
 - (2026-11-23) `[Body-Receiver]` Body 데이터 규약의 기준은 VishasBody 저장소(`docs/protocol/`). 받는 쪽이 어긋나면 이쪽을 맞추지 않고, 필요한 수정은 그 저장소의 GitHub 이슈로 올린다(예: Vishamos/Vishamos#1 버전 2 수신)
 - (2026-11-24) `[Body-Tech]` 추론 백엔드 선택 추가: ONNX Runtime DirectML(GPU, 기본) / MediaPipe(CPU, `BodyTrackerCPU.bat`). Windows MediaPipe에 GPU가 없어 모델을 ONNX로 변환해 실행, 포즈 23 → 10ms, 손 28∼31 → 13∼14ms. 방송 중(OBS + Vishamos)에도 30 FPS·OBS 손실 프레임 0. 그래서 GPU를 기본값으로 정함(명세 01 §1.6)
+- (2026-11-24) `[Body-View]` 트래커 창은 처음 표시할 때 한 번만 맨 앞으로 올리고, 맨 위 고정은 하지 않는다(방송 중 OBS 등을 가리지 않게, 명세 01 §2.4)

@@ -28,6 +28,7 @@
 | 2.1 | 실제 카메라 영상은 어떤 모드에서도 표시하지 않음 | 확정 | `[Body-View]` |
 | 2.2 | 간단 화면 / 디버그 화면 전환 | 확정 | `[Body-View]` |
 | 2.3 | 거울 모드는 화면 표시에만 적용, 기본 켜짐 | 확정 | `[Body-View]` |
+| 2.4 | 트래커 창은 처음 표시할 때 한 번만 맨 앞으로 올린다. 맨 위 고정은 하지 않는다 | 확정(사용자 답변, 2026-11-24) | `[Body-View]`. 실행 PC에서 bat 실행 시 창이 다른 창 뒤에 가려짐. 계속 고정하면 방송 중 OBS 등을 가림 |
 
 ## 3. 송신
 | 번호 | 내용 | 구분 | 근거 |
@@ -75,6 +76,7 @@
 | 1.1∼1.4, 2.1∼2.3 | 완료 (이 명세 이전 구현) | `fd910f3` |
 | 1.1 손 비동기 | 완료 (`main.py`). 손 추론을 50ms로 늦춘 가짜 카메라 스모크에서 프레임 간격이 손을 기다리지 않음 확인. 송출 PC + Unity 실행 중 FPS 29.9∼31.0, 손 있을 때 pose 25∼26 / hand 27∼28 / infer 25∼27 / draw 3.7ms (2026-11-22). 카메라 버퍼 1장 설정(`CAP_PROP_BUFFERSIZE`)은 이 웹캠에서 무시되어 제거 | `18527d5` |
 | 1.5 | 보류 (Track-1 측정 대기) | |
+| 2.4 | 완료 (`renderer.py`). 첫 `imshow` 뒤 `WND_PROP_TOPMOST`를 켰다 바로 끔. 가짜 창 스모크로 한 번만 호출됨 확인, 실제로 맨 앞에 오는지는 실행 PC 확인 필요 | `[Track-3]` 커밋 |
 | 1.6 | 완료 (`onnx_trackers.py`, `main.py`, `BodyTrackerCPU.bat`, `tools/convert_onnx.py`, `test/test_onnx_geometry.py`). 실행 PC 실측: 같은 프레임에서 MediaPipe와 화면 좌표 차이 포즈 4∼7px·손 3∼5px, 실행 FPS 28.5(pose 13.7 / hand 17.1ms). DirectML은 두 스레드 동시 실행이 안 되어 GPU 실행만 잠금으로 직렬화. 방송 중(OBS + Vishamos, 1024×576, 송신 중) 손 보일 때 30.0 FPS, pose 14.8 / hand 22.3 / infer 15.0ms, OBS 손실 프레임 0·렌더링 60/60 FPS, 트래커 GPU 몫 약 25∼30%p(추정). 기본값 GPU 전환은 Track-12. 기록: `docs/work/onnx_gpu_backend.md` | `6450f73`, `36ef7fe`, `[Track-12]` 커밋 |
 | 3.1∼3.4 | 완료 (`synapse_sender.py`, `main.py`). 가짜 서버로 등록·송신·재접속 확인, 실제 서버 등록·송신 확인(2026-11-22) | `d5a9c0c` |
 | 4.1∼4.10 | 완료 (`body_packet.py`, `test/test_body_packet.py`). 버전 2 변경(4.1·4.2·4.4)은 Track-5 | `125ff89`, `27c2bbb` |
