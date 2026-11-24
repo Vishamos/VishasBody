@@ -43,13 +43,13 @@ Body(웹캠 바디 트래커, 시그니처 31)가 Vishamos(시그니처 11)로 �
 
 - 왼쪽/오른쪽은 **사람 기준**이다(화면 기준 아님). 트래커 화면의 거울 모드는 데이터에 영향이 없다.
 - 해당 flags 비트가 0인 부위는 값이 모두 0이다. 값으로 검출 여부를 추측하지 말고 flags를 본다.
-- `seq`·`timestamp_ms`와 모든 float가 4바이트 경계에 정렬되어 있다. 오프셋 16부터는 float 271개가 빈틈없이 이어진다. C# 예:
+- `seq`·`timestamp_ms`와 모든 float가 4바이트 경계에 정렬되어 있다. 오프셋 16부터는 float 269개가 빈틈없이 이어진다. C# 예:
   ```csharp
   ReadOnlySpan<float> f = MemoryMarshal.Cast<byte, float>(data.AsSpan(16, 1076)); // 복사 없음
   // 몸 i번 점: f[i*4 + 0..3] = x, y, z, visibility
   // 왼손 j번 점: f[132 + j*3 + 0..2], 왼손 회전: f[195..198]
   // 오른손 j번 점: f[199 + j*3 + 0..2], 오른손 회전: f[262..265]
-  // 루트 위치: f[268..270] = x, y, z (flags bit3이 1일 때만 유효)
+  // 루트 위치: f[266..268] = x, y, z (flags bit3이 1일 때만 유효)
   uint seq = BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(8));
   ```
 

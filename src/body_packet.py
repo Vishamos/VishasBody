@@ -24,7 +24,7 @@ HAND_FLOATS = HAND_POINTS * 3 + 4         # x, y, z + 손바닥 쿼터니언
 ROOT_FLOATS = 3                           # 루트 위치 x, y, z (맨 끝, 명세 01 §4.12)
 FLOAT_COUNT = POSE_FLOATS + HAND_FLOATS * 2 + ROOT_FLOATS
 
-# to, from, kind, version, flags, 예약 3바이트, seq, timestamp_ms, float 271개
+# to, from, kind, version, flags, 예약 3바이트, seq, timestamp_ms, float 269개
 PACKET_FORMAT = f"<BBBBB3xII{FLOAT_COUNT}f"
 PACKET_SIZE = struct.calcsize(PACKET_FORMAT)
 
