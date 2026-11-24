@@ -2,10 +2,9 @@
 
 > **현재 진행 (2026-11-24):** 송신·루트 위치 완료(패킷 버전 2, 1,092바이트). ONNX GPU 백엔드 추가(Track-8), 기본값으로 전환(Track-12).
 > **다음 할 일:**
-> 1. (Vishamos) 버전 2 수신·루트 위치 적용 확인 후 이슈 #1 닫기, 팔 점 visibility 처리 이슈 #2
-> 2. (사용자, 실행 PC) Track-3 확인: 트래커 창이 시작할 때 맨 앞에 오고, 다른 창을 누르면 그 뒤로 가는지
-> 3. (사용자) 실행 PC 확인: 서버 재시작 후 재등록, `py -3.12 -m pip show opencv-contrib-python` 버전 → Env-2
-> 4. Track-1 정지 떨림: ONNX 기록(`docs/work/onnx_gpu_backend.md` 5번)에 첫 측정값이 있음. 기준(손목 3mm)과 맞춰 볼지 결정
+> 1. (사용자, 실행 PC) Track-3 확인: 트래커 창이 시작할 때 맨 앞에 오고, 다른 창을 누르면 그 뒤로 가는지
+> 2. (사용자) 실행 PC 확인: 서버 재시작 후 재등록, `py -3.12 -m pip show opencv-contrib-python` 버전 → Env-2
+> 3. Track-1 정지 떨림: ONNX 기록(`docs/work/onnx_gpu_backend.md` 5번)에 첫 측정값이 있음. 기준(손목 3mm)과 맞춰 볼지 결정
 
 ## 운영 방식
 - **해야 할 작업만 적는다.** 끝난 항목은 지운다. 명세에 근거한 항목은 명세 "구현 현황"에, 명세 밖 항목은 커밋 메시지(항목 번호 포함)로만 남는다.
@@ -16,8 +15,6 @@
 
 ## 사용자 조치 대기
 - [ ] 노션 정리 (`docs/work/plan_review.md`)
-- [ ] (Vishamos 프로젝트) 버전 2 수신(1,092바이트, 루트 위치 적용): 이슈 Vishamos/Vishamos#1
-- [ ] (Vishamos 프로젝트) 팔 점 visibility가 낮을 때 직전 값 유지·약하게 반영(프로토콜 §3.1): 이슈 Vishamos/Vishamos#2
 - [ ] (실행 PC) 서버를 껐다 켰을 때 `[송신] VishaSynapse 등록 완료`가 다시 나오는지
 - [ ] (실행 PC) `.temp/live_bench_hand.py` 삭제: Track-8 작업 중 카메라 영상 미리보기 창을 띄운 측정 스크립트(안전 규칙 1 위반). git 제외라 실행 PC에만 있음
 - [ ] (실행 PC) `py -3.12 -m pip show opencv-contrib-python` 버전 알려 주기 (Env-2에 필요)
