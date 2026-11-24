@@ -127,9 +127,9 @@
 - [x] 1024x576의 `camera_fov_deg` 재보정: 74 (명세 01 구현 현황 "5.6 (1024×576)")
 - [x] 명세 01 §5.3 근거(해상도별 화각), §5.6 본문(직선 거리 비교) 갱신
 - [x] 넓은 화면에서 손 검출: 손을 쓰는 실행에서 74~80%로 640x480(65~70%)보다 낮지 않음 (6-1 실측표)
-- [ ] heavy 관절 모델은 변환만 함(`models/pose_landmarks_heavy.onnx`, GPU 단독 약 21 ms). `main.py`에 연결 안 함
+- 보류 (사용자 결정, 2026-11-24): heavy 관절 모델 연결. 지금은 full로 충분. 변환만 해 둠(`models/pose_landmarks_heavy.onnx`, GPU 단독 약 21 ms, 방송 중이면 30 FPS가 빠듯할 수 있음). 쓰게 되면 `main.py`의 `ONNX_MODELS`에 연결
 - [ ] 다른 PC에서 쓰려면 `models/*.onnx`를 복사하거나 `tools/convert_onnx.py`로 변환 (git 제외, 변환에는 TensorFlow 환경 필요)
-- [ ] README '실행 방법'의 모델 내려받기에 heavy `.task`가 없음 (heavy를 쓸 때만 필요)
+- 보류 (heavy와 함께): README '실행 방법'의 모델 내려받기에 heavy `.task` 추가
 
 ## 8. 모델 변환 (`tools/convert_onnx.py`)
 
