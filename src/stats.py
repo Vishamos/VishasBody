@@ -32,10 +32,14 @@ class TrackingStats:
         self.time_ema = {k: 0.0 for k in TIMING_KEYS}
         self._prev_t = time.time()
         self._prev_wl = None
+        self.first_t = self.last_t = None   # 첫·마지막 프레임 시각 (평균 FPS용)
 
     def begin_frame(self):
         self.frames += 1
         now = time.time()
+        if self.first_t is None:
+            self.first_t = now
+        self.last_t = now
         dt = now - self._prev_t
         self._prev_t = now
         if dt > 0:
@@ -72,8 +76,11 @@ class TrackingStats:
 
     def summary(self):
         elapsed = time.time() - self.start
+        # 평균 FPS는 첫 프레임~마지막 프레임 사이로 계산 (시작 준비·종료 처리 시간 제외)
+        span = (self.last_t - self.first_t) if self.frames > 1 else 0.0
+        fps = (self.frames - 1) / span if span > 0 else 0.0
         lines = ["", "===== 트래킹 요약 =====",
-                 f"시간 {elapsed:.1f}s, 프레임 {self.frames}, 평균 FPS {self.frames / max(elapsed, 1e-6):.1f}"]
+                 f"시간 {elapsed:.1f}s (프레임 구간 {span:.1f}s), 프레임 {self.frames}, 평균 FPS {fps:.1f}"]
         if self.frames:
             lines.append(f"포즈 검출 {self.detected / self.frames * 100:.1f}%")
             lines.append(f"손 검출  왼손 {self.hand_found[True] / self.frames * 100:.1f}%, "
