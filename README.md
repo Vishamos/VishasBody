@@ -25,7 +25,7 @@
 
 | 항목 | 상태 |
 |---|---|
-| 트래킹 (몸 + 손) | ✅ 동작, 약 30 FPS. 추론은 MediaPipe(CPU, 기본) 또는 ONNX(GPU, 선택) |
+| 트래킹 (몸 + 손) | ✅ 동작, 약 30 FPS. 추론은 ONNX(GPU, 기본) 또는 MediaPipe(CPU) |
 | 루트 위치 (카메라 기준 골반 위치) | ✅ 동작, 실행 PC 보정 완료 (화각 60°) |
 | 송신 | ✅ 실제 서버 등록·송신 확인 (2026-11-22). 패킷 버전 2, 1,092바이트 |
 | 프로토콜 | ✅ 확정: `docs/protocol/README.md`(받는 쪽용), `docs/tech_spec/01_body_packet.md`(근거·구현 현황) |
@@ -39,14 +39,14 @@
 
 ## 4. 실행 방법
 
-**`BodyTracker.bat`을 더블클릭**하면 됩니다(MediaPipe, CPU). GPU로 돌리려면 **`BodyTrackerGPU.bat`**(= `BodyTracker.bat --backend onnx`). 처음 한 번만 아래를 준비합니다.
+**`BodyTracker.bat`을 더블클릭**하면 됩니다(ONNX, GPU). CPU(MediaPipe)로 돌리려면 **`BodyTrackerCPU.bat`**(= `BodyTracker.bat --backend mediapipe`). ONNX 모델이 없는 PC나 GPU가 부족할 때 씁니다. 처음 한 번만 아래를 준비합니다.
 
-1. 모델 파일을 `models` 폴더에 내려받습니다 (Google MediaPipe 공식 모델, Apache 2.0, git 제외).
+1. MediaPipe 모델 파일을 `models` 폴더에 내려받습니다(두 방식 모두 필요) (Google MediaPipe 공식 모델, Apache 2.0, git 제외).
    ```powershell
    Invoke-WebRequest https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/latest/pose_landmarker_full.task -OutFile models\pose_landmarker_full.task
    Invoke-WebRequest https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/latest/hand_landmarker.task -OutFile models\hand_landmarker.task
    ```
-2. (GPU 실행 시만) ONNX 모델 `models/*.onnx`를 준비합니다(git 제외). 이미 변환한 PC에서 복사하거나 `tools/convert_onnx.py`로 변환합니다. 변환에는 TensorFlow가 든 별도 가상환경이 필요합니다(`docs/work/onnx_gpu_backend.md` 8번).
+2. ONNX 모델 `models/*.onnx`를 준비합니다(git 제외, CPU로만 돌릴 PC는 생략). 이미 변환한 PC에서 복사하거나 `tools/convert_onnx.py`로 변환합니다. 변환에는 TensorFlow가 든 별도 가상환경이 필요합니다(`docs/work/onnx_gpu_backend.md` 8번).
 3. 서버 주소 파일을 만듭니다 (git 제외).
    ```powershell
    Copy-Item config\config.example.json config\config.local.json   # 열어서 server_url을 서버 PC의 LAN IP로 고침
@@ -57,7 +57,7 @@
 
 - 패키지는 `BodyTracker.bat`이 빠진 것이 있을 때 `requirements.txt`대로 자동 설치합니다. `.venv`가 있으면 그 Python, 없으면 `py -3.12`를 씁니다. 직접 설치하려면 `py -3.12 -m pip install -r requirements.txt`.
 - 개발 PC도 `.venv`(3.12)를 만들어 같은 버전으로 맞춥니다. 웹캠 실행은 실행 PC에서 합니다.
-- 옵션: `--debug`(디버그 화면으로 시작), `--camera 1`(카메라 번호), `--backend onnx`(GPU)
+- 옵션: `--debug`(디버그 화면으로 시작), `--camera 1`(카메라 번호), `--backend mediapipe`(CPU)
 
 | 조작 | 기능 |
 |---|---|
@@ -72,7 +72,7 @@
 | 위치 | 역할 |
 |---|---|
 | `BodyTracker.bat` | 실행 파일. `.venv`가 있으면 그 Python, 없으면 `py -3.12`. 빠진 패키지 자동 설치. 인자는 `main.py`로 넘김 |
-| `BodyTrackerGPU.bat` | `BodyTracker.bat --backend onnx` |
+| `BodyTrackerCPU.bat` | `BodyTracker.bat --backend mediapipe` |
 | `requirements.txt` | 패키지 버전 고정 (mediapipe, opencv-python, websockets, onnxruntime-directml) |
 | `config/` | `config.example.json`(예시), `config.local.json`(PC별 서버 주소·화각, git 제외) |
 | `models/` | MediaPipe 모델 `*.task`(4번 명령으로 내려받음), ONNX 모델 `*.onnx`(변환). 모두 git 제외 |
@@ -103,7 +103,7 @@
 | 상반신만 사용 | 방송 자세 (앉아서 책상 앞) |
 | **Hand Landmarker 추가** | Pose 모델의 손 점(검지·새끼)으로는 손 뒤집기(앞/뒤)가 판별되지 않았음. Hand 21점으로는 `PALM FRONT/BACK` 정상 판별 확인 |
 | **Pose와 Hand 병렬 실행**, 몸은 손을 기다리지 않음 | 순차 실행 시 약 20 FPS. 병렬로 30 근처, 손이 보이면 손 추론이 프레임을 붙잡아 25로 떨어져 손은 최신 완료 결과를 씀 (명세 01 §1.1) |
-| **GPU는 선택(ONNX 백엔드), 기본은 CPU** | Windows용 MediaPipe는 GPU가 빌드에서 빠져 있음 (`GPU processing is disabled in build flags`). 모델을 ONNX로 바꿔 DirectML로 돌리면 포즈 23 → 10ms, 손 28∼31 → 13∼14ms. 방송 중(OBS + Vishamos)에도 30 FPS, OBS 손실 프레임 0 확인(2026-11-24). 기본값 전환은 결정 대기 |
+| **기본은 GPU(ONNX 백엔드), CPU(MediaPipe)는 선택** | Windows용 MediaPipe는 GPU가 빌드에서 빠져 있음 (`GPU processing is disabled in build flags`). 모델을 ONNX로 바꿔 DirectML로 돌리면 포즈 23 → 10ms, 손 28∼31 → 13∼14ms. 방송 중(OBS + Vishamos)에도 30 FPS, OBS 손실 프레임 0 확인 후 기본값으로 정함(2026-11-24) |
 | **목표: 30 FPS 유지** | 프레임 예산 약 33ms. 새 기능은 이 안에 들어가는지 먼저 확인 |
 | 몸통은 **어깨선 위주**로 계산하는 게 적합 (받는 쪽 참고) | 앉은 자세에서 골반 가시성 **0.00** (책상에 가려 MediaPipe가 추측한 값) |
 | 트래커는 **트래킹 + 연결·송신만** 담당 | 역할 분리. 송신 방식은 송신 계층에서만 바꿈 |

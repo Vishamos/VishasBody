@@ -2,6 +2,7 @@
 
 > 실행 PC(웹캠 PC)에서 사용자 요청으로 다른 Claude Code 세션이 작업한 내용이다. 프로젝트 세션이 상황을 파악하도록 정리한다.
 > 관련 커밋: `6450f73`(추가), `36ef7fe`(GPU 잠금·손 중복 제거), `83efbfb`(16:9 해상도), `5a1a4cd`(평균 FPS·재보정 기록), `7cbdd67`(명세 5.3·5.6), 이후 문서 갱신.
+> **이후 변경: GPU(ONNX)가 기본값이 됐다(Track-12). `BodyTracker.bat` = GPU, `BodyTrackerGPU.bat`은 없어지고 `BodyTrackerCPU.bat` = MediaPipe CPU. 아래 내용은 작업 당시 기록이다.**
 > 6번 충돌은 2026-11-24 프로젝트 세션이 정리했다(CLAUDE.md 규칙 3, README, 명세 01 §1.6, worklist Track-9·10).
 
 ## 1. 요약

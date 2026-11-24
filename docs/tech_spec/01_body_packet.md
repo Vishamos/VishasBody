@@ -20,7 +20,7 @@
 | 1.3 | 왼손/오른손은 사람 기준. 포즈 손목과의 거리로 판정, 포즈가 없으면 모델 라벨 | 확정 | `[Body-Track-Hand]` |
 | 1.4 | 손바닥 축: 손가락 방향 = 손목 → 중지 뿌리, 손바닥 방향 = 손바닥 면 수직(손바닥이 향하는 쪽) | 확정 | `[Body-Track-Hand]` |
 | 1.5 | 스무딩 여부와 위치. 정지 떨림 측정(5초 × 자세 2∼3개) 후 결정 | 보류 | `[Body-Track-Smooth]` |
-| 1.6 | 추론 백엔드를 실행 옵션으로 고른다: MediaPipe(CPU, **기본**) / ONNX Runtime DirectML(GPU, `--backend onnx`). ONNX는 같은 모델을 변환해 쓰고 MediaPipe의 전후 처리(검출, 영역 추적, 스무딩)를 다시 구현해 결과 모양을 같게 한다. 패킷은 백엔드와 관계없이 같다 | 확정(사용자 요청, 2026-11-24) | 기획 없음(사용자 요청). Windows용 MediaPipe는 GPU가 빌드에서 빠져 있음. 실행 PC에서 포즈 23 → 10ms, 손 28∼31 → 13∼14ms. 방송 중(OBS + Vishamos) 측정에서도 30 FPS·OBS 손실 프레임 0(2026-11-24). 기본값을 GPU로 바꿀지는 사용자 결정 대기 |
+| 1.6 | 추론 백엔드를 실행 옵션으로 고른다: ONNX Runtime DirectML(GPU, **기본**) / MediaPipe(CPU, `--backend mediapipe`). ONNX는 같은 모델을 변환해 쓰고 MediaPipe의 전후 처리(검출, 영역 추적, 스무딩)를 다시 구현해 결과 모양을 같게 한다. 패킷은 백엔드와 관계없이 같다 | 확정(사용자 요청, 2026-11-24. 기본값 GPU도 같은 날 사용자 결정) | 기획 없음(사용자 요청). Windows용 MediaPipe는 GPU가 빌드에서 빠져 있음. 실행 PC에서 포즈 23 → 10ms, 손 28∼31 → 13∼14ms. 방송 중(OBS + Vishamos) 측정에서도 30 FPS·OBS 손실 프레임 0(2026-11-24). 그래서 GPU를 기본값으로 함 |
 
 ## 2. 화면
 | 번호 | 내용 | 구분 | 근거 |
@@ -75,7 +75,7 @@
 | 1.1∼1.4, 2.1∼2.3 | 완료 (이 명세 이전 구현) | `fd910f3` |
 | 1.1 손 비동기 | 완료 (`main.py`). 손 추론을 50ms로 늦춘 가짜 카메라 스모크에서 프레임 간격이 손을 기다리지 않음 확인. 송출 PC + Unity 실행 중 FPS 29.9∼31.0, 손 있을 때 pose 25∼26 / hand 27∼28 / infer 25∼27 / draw 3.7ms (2026-11-22). 카메라 버퍼 1장 설정(`CAP_PROP_BUFFERSIZE`)은 이 웹캠에서 무시되어 제거 | `18527d5` |
 | 1.5 | 보류 (Track-1 측정 대기) | |
-| 1.6 | 완료 (`onnx_trackers.py`, `main.py`, `BodyTrackerGPU.bat`, `tools/convert_onnx.py`, `test/test_onnx_geometry.py`). 실행 PC 실측: 같은 프레임에서 MediaPipe와 화면 좌표 차이 포즈 4∼7px·손 3∼5px, 실행 FPS 28.5(pose 13.7 / hand 17.1ms). DirectML은 두 스레드 동시 실행이 안 되어 GPU 실행만 잠금으로 직렬화. 방송 중(OBS + Vishamos, 1024×576, 송신 중) 손 보일 때 30.0 FPS, pose 14.8 / hand 22.3 / infer 15.0ms, OBS 손실 프레임 0·렌더링 60/60 FPS, 트래커 GPU 몫 약 25∼30%p(추정). 기록: `docs/work/onnx_gpu_backend.md` | `6450f73`, `36ef7fe` |
+| 1.6 | 완료 (`onnx_trackers.py`, `main.py`, `BodyTrackerCPU.bat`, `tools/convert_onnx.py`, `test/test_onnx_geometry.py`). 실행 PC 실측: 같은 프레임에서 MediaPipe와 화면 좌표 차이 포즈 4∼7px·손 3∼5px, 실행 FPS 28.5(pose 13.7 / hand 17.1ms). DirectML은 두 스레드 동시 실행이 안 되어 GPU 실행만 잠금으로 직렬화. 방송 중(OBS + Vishamos, 1024×576, 송신 중) 손 보일 때 30.0 FPS, pose 14.8 / hand 22.3 / infer 15.0ms, OBS 손실 프레임 0·렌더링 60/60 FPS, 트래커 GPU 몫 약 25∼30%p(추정). 기본값 GPU 전환은 Track-12. 기록: `docs/work/onnx_gpu_backend.md` | `6450f73`, `36ef7fe`, `[Track-12]` 커밋 |
 | 3.1∼3.4 | 완료 (`synapse_sender.py`, `main.py`). 가짜 서버로 등록·송신·재접속 확인, 실제 서버 등록·송신 확인(2026-11-22) | `d5a9c0c` |
 | 4.1∼4.10 | 완료 (`body_packet.py`, `test/test_body_packet.py`). 버전 2 변경(4.1·4.2·4.4)은 Track-5 | `125ff89`, `27c2bbb` |
 | 4.11 | 보류 | |

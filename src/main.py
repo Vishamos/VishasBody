@@ -45,8 +45,8 @@ def main():
     parser = argparse.ArgumentParser(description="웹캠 상반신 + 손 트래킹 -> VishaSynapse 송신")
     parser.add_argument("--debug", action="store_true", help="디버그 화면으로 시작 (실행 중 d 키로 전환)")
     parser.add_argument("--camera", type=int, default=0, help="카메라 번호")
-    parser.add_argument("--backend", choices=("mediapipe", "onnx"), default="mediapipe",
-                        help="추론 방식: mediapipe(CPU, 기본) / onnx(ONNX Runtime DirectML GPU)")
+    parser.add_argument("--backend", choices=("mediapipe", "onnx"), default="onnx",
+                        help="추론 방식: onnx(ONNX Runtime DirectML GPU, 기본) / mediapipe(CPU)")
     args = parser.parse_args()
 
     missing = [p.name for p in (POSE_MODEL, HAND_MODEL) if not p.exists()]
@@ -56,7 +56,8 @@ def main():
     if args.backend == "onnx":
         missing = [p.name for p in ONNX_MODELS.values() if not p.exists()]
         if missing:
-            print(f"[모델] models 폴더에 {', '.join(missing)}이 없습니다. tools/convert_onnx.py로 변환하세요")
+            print(f"[모델] models 폴더에 {', '.join(missing)}이 없습니다. tools/convert_onnx.py로 변환하거나 "
+                  "BodyTrackerCPU.bat(--backend mediapipe)으로 실행하세요")
             return
         from onnx_trackers import OnnxHandTracker, OnnxPoseTracker
         pose_tracker = OnnxPoseTracker(ONNX_MODELS["pose_detector"], ONNX_MODELS["pose_landmarks_full"])
