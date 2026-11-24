@@ -10,6 +10,7 @@
 좌표는 모두 픽셀 단위로 계산하고, 결과에서만 0~1로 정규화한다.
 """
 import math
+import threading
 
 import cv2
 import numpy as np
@@ -26,6 +27,7 @@ POSE_ROI_SCALE = 1.25
 HAND_PALM_ROI = dict(scale=2.6, shift_y=-0.5)    # 손바닥 검출 → 손 영역
 HAND_TRACK_ROI = dict(scale=2.0, shift_y=-0.1)   # 손 관절 → 다음 프레임 손 영역
 HAND_SAME_IOU = 0.5        # 새로 검출한 손바닥이 추적 중인 손과 이만큼 겹치면 같은 손으로 봄
+HAND_DUP_DIST = 0.25       # 두 손의 21점 평균 거리가 손바닥 길이(손목~가운데 뿌리)의 이 비율 미만이면 같은 손
 HEATMAP_KERNEL = 7
 HEATMAP_MIN_CONF = 0.5
 POSE_AUX = (33, 34)        # 영역 계산용 보조점 (골반 중심, 몸 크기 기준점)
@@ -203,25 +205,44 @@ class LandmarkSmoother:
         return self.f(t, pts, scale)
 
 
-def make_session(path, use_gpu):
-    so = ort.SessionOptions()
-    providers = ["CPUExecutionProvider"]
-    if use_gpu:
-        so.enable_mem_pattern = False                       # DirectML 권장 설정
-        so.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
-        providers = ["DmlExecutionProvider", "CPUExecutionProvider"]
-    s = ort.InferenceSession(str(path), so, providers=providers)
-    return s, s.get_inputs()[0].name
+# DirectML은 서로 다른 세션이라도 두 스레드가 동시에 실행하면 실패한다
+# (80004005 "지정되지 않은 오류", main.py의 포즈·손 병렬 실행에서 발생). GPU 실행만 한 번에 하나씩.
+_GPU_LOCK = threading.Lock()
 
 
-def detect_ssd(session, input_name, rgb, size, strides, num_kp, threshold, value_range, anchors):
+class Model:
+    """ONNX 세션 + 입력 이름. GPU면 실행을 공용 잠금으로 직렬화한다 (전후 처리는 계속 병렬)."""
+
+    def __init__(self, path, use_gpu):
+        so = ort.SessionOptions()
+        providers = ["CPUExecutionProvider"]
+        if use_gpu:
+            so.enable_mem_pattern = False                       # DirectML 권장 설정
+            so.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
+            providers = ["DmlExecutionProvider", "CPUExecutionProvider"]
+        self.session = ort.InferenceSession(str(path), so, providers=providers)
+        self.input_name = self.session.get_inputs()[0].name
+        self.lock = _GPU_LOCK if use_gpu else None
+
+    @property
+    def providers(self):
+        return self.session.get_providers()
+
+    def run(self, x):
+        if self.lock is None:
+            return self.session.run(None, {self.input_name: x})
+        with self.lock:
+            return self.session.run(None, {self.input_name: x})
+
+
+def detect_ssd(model, rgb, size, strides, num_kp, threshold, value_range, anchors):
     """검출 모델 실행 → NMS 후 [(score, box 픽셀(xmin, ymin, xmax, ymax), keypoints 픽셀 (K, 2))]."""
     h, w = rgb.shape[:2]
     rect = letterbox_rect(w, h)
     x = crop(rgb, rect, size, cv2.BORDER_CONSTANT)
     if value_range == (-1, 1):
         x = x * 2.0 - 1.0
-    raw_boxes, raw_scores = session.run(None, {input_name: x})
+    raw_boxes, raw_scores = model.run(x)
     scores = sigmoid(np.clip(raw_scores[0, :, 0], -100, 100))
     keep = scores >= threshold
     if not keep.any():
@@ -246,8 +267,8 @@ class OnnxPoseTracker:
     """MediaPipe Pose Landmarker(VIDEO, num_poses=1)와 같은 결과 모양. with 문으로 사용."""
 
     def __init__(self, detector_path, landmark_path, use_gpu=True, min_detection=0.5, min_presence=0.5):
-        self.det, self.det_in = make_session(detector_path, use_gpu)
-        self.lmk, self.lmk_in = make_session(landmark_path, use_gpu)
+        self.det = Model(detector_path, use_gpu)
+        self.lmk = Model(landmark_path, use_gpu)
         self.anchors = ssd_anchors(POSE_DETECT_SIZE, POSE_ANCHOR_STRIDES)
         self.min_detection, self.min_presence = min_detection, min_presence
         self.rect = None
@@ -258,7 +279,7 @@ class OnnxPoseTracker:
 
     @property
     def providers(self):
-        return self.lmk.get_providers()
+        return self.lmk.providers
 
     def _reset(self):
         self.rect = None
@@ -271,7 +292,7 @@ class OnnxPoseTracker:
         h, w = rgb.shape[:2]
         t = timestamp_ms / 1000.0
         if self.rect is None:
-            found = detect_ssd(self.det, self.det_in, rgb, POSE_DETECT_SIZE, POSE_ANCHOR_STRIDES, 4,
+            found = detect_ssd(self.det, rgb, POSE_DETECT_SIZE, POSE_ANCHOR_STRIDES, 4,
                                self.min_detection, (-1, 1), self.anchors)
             if not found:
                 return PoseResult()
@@ -279,8 +300,7 @@ class OnnxPoseTracker:
             self.rect = rect_from_points(kps[0], kps[1], POSE_ROI_SCALE)
 
         rect = self.rect
-        lm, flag, _seg, heat, world = self.lmk.run(None, {self.lmk_in: crop(rgb, rect, POSE_LANDMARK_SIZE,
-                                                                            cv2.BORDER_REPLICATE)})
+        lm, flag, _seg, heat, world = self.lmk.run(crop(rgb, rect, POSE_LANDMARK_SIZE, cv2.BORDER_REPLICATE))
         if float(flag[0, 0]) < self.min_presence:   # 출력에 이미 sigmoid가 적용돼 있음
             self._reset()
             return PoseResult()
@@ -375,6 +395,12 @@ def rect_iou(a, b):
     return inter / union if union > 0 else 0.0
 
 
+def same_hand(a, b):
+    """두 손 관절(픽셀, (21, 2 이상))이 같은 손인지. 겹쳐 있는 서로 다른 손은 관절 위치가 달라 걸리지 않는다."""
+    palm = max(np.linalg.norm(a[9, :2] - a[0, :2]), np.linalg.norm(b[9, :2] - b[0, :2]), 1e-6)
+    return float(np.linalg.norm(a[:, :2] - b[:, :2], axis=1).mean()) < HAND_DUP_DIST * palm
+
+
 class _HandTrack:
     def __init__(self, rect):
         self.rect = rect
@@ -390,15 +416,15 @@ class OnnxHandTracker:
 
     def __init__(self, detector_path, landmark_path, use_gpu=True, num_hands=2,
                  min_detection=0.5, min_presence=0.5):
-        self.det, self.det_in = make_session(detector_path, use_gpu)
-        self.lmk, self.lmk_in = make_session(landmark_path, use_gpu)
+        self.det = Model(detector_path, use_gpu)
+        self.lmk = Model(landmark_path, use_gpu)
         self.anchors = ssd_anchors(HAND_DETECT_SIZE, HAND_ANCHOR_STRIDES)
         self.num_hands, self.min_detection, self.min_presence = num_hands, min_detection, min_presence
         self.tracks = []
 
     @property
     def providers(self):
-        return self.lmk.get_providers()
+        return self.lmk.providers
 
     def detect(self, image, timestamp_ms):
         rgb = image.numpy_view() if hasattr(image, "numpy_view") else image
@@ -406,7 +432,7 @@ class OnnxHandTracker:
         t = timestamp_ms / 1000.0
         tracks = list(self.tracks)
         if len(tracks) < self.num_hands:
-            for score, box, kps in detect_ssd(self.det, self.det_in, rgb, HAND_DETECT_SIZE, HAND_ANCHOR_STRIDES, 7,
+            for score, box, kps in detect_ssd(self.det, rgb, HAND_DETECT_SIZE, HAND_ANCHOR_STRIDES, 7,
                                               self.min_detection, (0, 1), self.anchors):
                 if len(tracks) >= self.num_hands:
                     break
@@ -416,11 +442,10 @@ class OnnxHandTracker:
                 if all(rect_iou(rect, tr.rect) <= HAND_SAME_IOU for tr in tracks):
                     tracks.append(_HandTrack(rect))
 
-        kept, landmarks, worlds, handedness = [], [], [], []
+        found = []   # (추적, 존재 점수, 픽셀 점 (21, 3), 월드 점 (21, 3), 좌우 출력)
         for tr in tracks:
             rect = tr.rect
-            lm, presence, side, world = self.lmk.run(None, {self.lmk_in: crop(rgb, rect, HAND_LANDMARK_SIZE,
-                                                                              cv2.BORDER_REPLICATE)})
+            lm, presence, side, world = self.lmk.run(crop(rgb, rect, HAND_LANDMARK_SIZE, cv2.BORDER_REPLICATE))
             if float(presence[0, 0]) < self.min_presence:
                 continue
             lm = lm.reshape(21, 3)
@@ -431,12 +456,21 @@ class OnnxHandTracker:
             wl = world.reshape(21, 3)
             wl = tr.smooth_world(t, np.stack([wl[:, 0] * c - wl[:, 1] * s, wl[:, 0] * s + wl[:, 1] * c, wl[:, 2]], -1))
             tr.rect = transform_rect(hand_rect_from_landmarks(pts[:, :2]), **HAND_TRACK_ROI)
-            kept.append(tr)
-            landmarks.append([Landmark(float(p[0] / w), float(p[1] / h), float(p[2] / w)) for p in pts])
-            worlds.append([Landmark(float(p[0]), float(p[1]), float(p[2])) for p in wl])
-            p = float(side[0, 0])
-            handedness.append([Category(1, p, self.HIGH_LABEL) if p > 0.5 else Category(0, 1 - p, self.LOW_LABEL)])
-        self.tracks = kept
+            found.append((tr, float(presence[0, 0]), pts, wl, float(side[0, 0])))
+
+        # 두 추적이 같은 손으로 모이면(손이 겹칠 때) 존재 점수가 높은 쪽만 남김.
+        # 남은 추적이 최대 개수보다 적어지므로 다음 프레임에 손바닥 검출이 다시 돌아 다른 손을 찾는다.
+        keep = []
+        for item in sorted(found, key=lambda f: -f[1]):
+            if all(not same_hand(item[2], k[2]) for k in keep):
+                keep.append(item)
+        found = [f for f in found if any(f is k for k in keep)]   # 원래 추적 순서 유지
+
+        self.tracks = [f[0] for f in found]
+        landmarks = [[Landmark(float(p[0] / w), float(p[1] / h), float(p[2] / w)) for p in f[2]] for f in found]
+        worlds = [[Landmark(float(p[0]), float(p[1]), float(p[2])) for p in f[3]] for f in found]
+        handedness = [[Category(1, f[4], self.HIGH_LABEL) if f[4] > 0.5 else Category(0, 1 - f[4], self.LOW_LABEL)]
+                      for f in found]
         return HandResult(landmarks, worlds, handedness)
 
     def close(self):

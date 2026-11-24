@@ -9,7 +9,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 from onnx_trackers import (HAND_ANCHOR_STRIDES, HAND_DETECT_SIZE, POSE_ANCHOR_STRIDES,  # noqa: E402
                            POSE_DETECT_SIZE, OneEuro, crop, hand_rect_from_landmarks, rect_from_points,
-                           rect_iou, roi_points, ssd_anchors, transform_rect, weighted_nms)
+                           rect_iou, roi_points, same_hand, ssd_anchors, transform_rect, weighted_nms)
 
 
 class AnchorTest(unittest.TestCase):
@@ -79,6 +79,28 @@ class RectTest(unittest.TestCase):
         self.assertAlmostEqual(rect_iou((0, 0, 10, 10, 0), (0, 0, 10, 10, 1.0)), 1.0)   # 회전 무시
         self.assertAlmostEqual(rect_iou((0, 0, 10, 10, 0), (5, 0, 10, 10, 0)), 50 / 150)
         self.assertEqual(rect_iou((0, 0, 10, 10, 0), (20, 0, 10, 10, 0)), 0.0)
+
+
+def upright_hand(wrist_x, wrist_y=200.0, flip=False):
+    # 손목 아래, 손가락 위로 선 손 (손바닥 길이 = 손목~9번 = 30 + 15 = 45px). flip이면 엄지가 반대쪽
+    pix = np.zeros((21, 2))
+    pix[0] = (wrist_x, wrist_y)
+    xs = (-30, -15, 0, 15, 30)
+    for i, dx in zip((1, 5, 9, 13, 17), xs[::-1] if flip else xs):
+        for k in range(4):
+            pix[i + k] = (wrist_x + dx, wrist_y - 30 - 15 * k)
+    return pix
+
+
+class SameHandTest(unittest.TestCase):
+    def test_two_tracks_on_one_hand(self):
+        a = upright_hand(100)
+        self.assertTrue(same_hand(a, a + 3.0))                 # 몇 px 차이 = 같은 손
+
+    def test_overlapping_different_hands(self):
+        # 손바닥 반쯤 겹친 두 손 (손목 20px 차이, 엄지 방향 반대): 다른 손
+        self.assertFalse(same_hand(upright_hand(100), upright_hand(120, flip=True)))
+        self.assertFalse(same_hand(upright_hand(100), upright_hand(300)))
 
 
 class NmsTest(unittest.TestCase):
