@@ -1,4 +1,6 @@
 {
     "server_url": "ws://<서버 PC의 LAN IP>:4000",
-    "camera_fov_deg": 72
+    "camera_fov_deg": 72,
+    "camera_width": 960,
+    "camera_height": 540
 }

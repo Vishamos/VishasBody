@@ -69,6 +69,13 @@ def main():
 
     cap = cv2.VideoCapture(args.camera, cv2.CAP_DSHOW)
     config = load_config()
+    if "camera_width" in config and "camera_height" in config:
+        # 카메라에 요청할 해상도. 드라이버가 가까운 모드를 고르므로 실제 크기는 첫 프레임의 [루트] 줄에서 확인
+        # (실행 PC RPC-20F: 960x540 요청 -> 1024x576 30 FPS, 1024x576을 그대로 요청하면 15 FPS)
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, config["camera_width"])
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, config["camera_height"])
+        cap.set(cv2.CAP_PROP_FPS, 30)
+        print(f"[카메라] 해상도 요청 {config['camera_width']}x{config['camera_height']}")
     server_url = config["server_url"] if config else None
     fov_deg = config.get("camera_fov_deg", DEFAULT_FOV_DEG)
     focal = None            # 첫 프레임 해상도로 한 번 계산 (명세 01 §5.3)
