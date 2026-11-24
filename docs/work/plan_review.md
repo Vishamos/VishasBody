@@ -21,3 +21,4 @@
 - (2026-11-23) **새 기획 항목(태그 제안 `[Body-Packet-Root]`)**: 아바타가 사람의 앞뒤·좌우 이동을 따라가도록 카메라 기준 골반 위치를 보냄. 패킷 맨 끝에 float 3개 → 1,092바이트, 버전 2, flags bit3 = 위치 유효. 위치 계산에는 몸통(얼굴·어깨·골반)만 쓴다(팔은 뻗으면 깊이 추정이 틀려 위치를 끌고 감). 카메라 화각은 PC별 설정(기본 72°), 줄자로 잰 거리에서 한 번 보정: 실행 PC 웹캠 RPC-20F는 **60°**(1.0m·1.4m 실측, 오차 약 5% 이내). 시작 위치 기준 보정은 받는 쪽(명세 01 §5)
 - (2026-11-23) `[Body-Packet-Header]` 크기 1,080 → 1,092바이트, 버전 1 → 2 (위 항목 때문)
 - (2026-11-23) `[Body-Receiver]` Body 데이터 규약의 기준은 VishasBody 저장소(`docs/protocol/`). 받는 쪽이 어긋나면 이쪽을 맞추지 않고, 필요한 수정은 그 저장소의 GitHub 이슈로 올린다(예: Vishamos/Vishamos#1 버전 2 수신)
+- (2026-11-24) `[Body-Tech]` 추론 백엔드 선택 추가: MediaPipe(CPU, 기본) / ONNX Runtime DirectML(GPU, `BodyTrackerGPU.bat`). Windows MediaPipe에 GPU가 없어 모델을 ONNX로 변환해 실행, 포즈 23 → 10ms, 손 28∼31 → 13∼14ms. Unity + OBS와 함께 쓸 때 측정 후 기본값 결정(명세 01 §1.6)
