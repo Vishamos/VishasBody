@@ -1,7 +1,7 @@
 # ONNX GPU 백엔드 추가 기록 (2026-11-24)
 
 > 실행 PC(웹캠 PC)에서 사용자 요청으로 다른 Claude Code 세션이 작업한 내용이다. 프로젝트 세션이 상황을 파악하도록 정리한다.
-> **커밋 전 상태로 작성됐다.** 이 문서와 아래 코드 변경이 커밋·푸시됐는지 `git log`로 확인할 것.
+> 관련 커밋: `6450f73`(추가), `36ef7fe`(GPU 잠금·손 중복 제거), `83efbfb`(16:9 해상도), `5a1a4cd`(평균 FPS·재보정 기록), `7cbdd67`(명세 5.3·5.6), 이후 문서 갱신.
 
 ## 1. 요약
 
@@ -36,7 +36,7 @@
 | `requirements.txt` | `onnxruntime-directml==1.24.4` 추가 |
 | `.gitignore` | `*.onnx` 추가 |
 | `tools/convert_onnx.py` (새 파일) | `.task` → ONNX 모델 변환 (8번) |
-| `test/test_onnx_geometry.py` (새 파일) | 앵커 수(2254·2016), 영역 회전·이동, 크롭↔투영 왕복, 가중 NMS, OneEuro 필터. 모델 없이 실행됨. 기존 테스트 포함 40개 통과 |
+| `test/test_onnx_geometry.py` (새 파일) | 앵커 수(2254·2016), 영역 회전·이동, 크롭↔투영 왕복, 가중 NMS, OneEuro 필터, 같은 손 판정(`same_hand`). 모델 없이 실행됨. 기존 테스트 포함 42개 통과 |
 | `models/*.onnx` (git 제외) | `pose_detector`, `pose_landmarks_full`, `pose_landmarks_heavy`, `hand_detector`, `hand_landmarks` |
 
 ## 4. 구현 구조 (`src/onnx_trackers.py`)
@@ -113,7 +113,7 @@
 ## 7. 남은 일 / 확인 안 된 것
 
 - [x] 종료 요약의 평균 FPS를 첫~마지막 프레임 구간으로 계산(`stats.py`, 시작 준비·종료 처리 제외). 짧은 실행에서 26.2로 낮게 보이던 것이 29.9로 나옴(전체 16.3s, 프레임 구간 14.8s)
-- [x] `BodyTrackerGPU.bat --debug` 실제 실행 (40.7초): 평균 FPS 28.5, pose 13.7 ms, hand 17.1 ms, infer 13.9 ms, draw 3.9 ms, 포즈 검출 100%, 손 왼 69.9% / 오 65.3%. 사용자 평가 "상당히 부드럽고 만족스러움". 30이 아니라 28.5인 이유는 미확인
+- [x] `BodyTrackerGPU.bat --debug` 실제 실행 (40.7초): 평균 FPS 28.5, pose 13.7 ms, hand 17.1 ms, infer 13.9 ms, draw 3.9 ms, 포즈 검출 100%, 손 왼 69.9% / 오 65.3%. 사용자 평가 "상당히 부드럽고 만족스러움". 30이 아니라 28.5인 것은 당시 평균 FPS가 시작 준비·종료 처리 시간을 포함했기 때문으로 보임(수정 후 같은 GPU 구성에서 29.9. 이 실행 자체를 다시 재지는 않음)
 - [ ] **Unity + OBS를 켠 상태**에서 GPU 공유 시 속도 (모든 GPU 수치는 GPU가 한가할 때 측정)
 - [ ] 가정한 필터 계수·영역 배율을 MediaPipe 원본 그래프 설정과 대조
 - [x] 1024x576의 `camera_fov_deg` 재보정: 74 (명세 01 구현 현황 "5.6 (1024×576)")
