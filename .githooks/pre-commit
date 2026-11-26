@@ -1,5 +1,5 @@
 #!/bin/sh
-# 커밋 전 검사 (capture-git 스킬 "커밋 전 검사").
+# 커밋 전 검사 (CLAUDE.md "커밋 (이 프로젝트 전용)").
 # 설치: git config core.hooksPath .githooks
 # 실패하면 커밋을 막는다.
 

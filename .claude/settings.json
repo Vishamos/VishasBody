@@ -86,5 +86,21 @@
       "mcp__claude_ai_Notion__notion-update-view",
       "mcp__claude_ai_Notion__notion-upload-skill"
     ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python -B \"$CLAUDE_PROJECT_DIR/.claude/hooks/check_syntax.py\""
+          }
+        ]
+      }
+    ]
+  },
+  "enabledPlugins": {
+    "visha-common@vishas-agent": true
   }
 }

@@ -187,3 +187,7 @@ cython_debug/
 # 서버 주소 등 PC별 설정
 config.local.*
 CLAUDE.local.md
+
+# 보안 점검 보고서(security), qa 시나리오 로그
+.private/
+logs/
